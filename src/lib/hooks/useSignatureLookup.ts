@@ -1,89 +1,85 @@
-import { useQuery, type QueryOptions } from '@tanstack/react-query'
+import { type QueryOptions, useQuery } from "@tanstack/react-query";
 
 // Type definitions based on the OpenAPI schema
 export type SignatureItem = {
-  name: string
-  filtered: boolean
-}
+	name: string;
+	filtered: boolean;
+};
 
 export type SignatureResponse = {
-  function?: Record<string, SignatureItem[]|null>
-  event?: Record<string, SignatureItem[]>
-}
+	function?: Record<string, SignatureItem[] | null>;
+	event?: Record<string, SignatureItem[]>;
+};
 
 interface ApiResponse {
-  ok: boolean
-  result: SignatureResponse
+	ok: boolean;
+	result: SignatureResponse;
 }
 
 interface LookupParams {
-  functionHashes?: string[]
-  eventHashes?: string[]
-  filter?: boolean
+	functionHashes?: string[];
+	eventHashes?: string[];
+	filter?: boolean;
 }
 
 // API client function
 const lookupSignatures = async (params: LookupParams): Promise<ApiResponse> => {
-  const url = new URL('https://api.openchain.xyz/signature-database/v1/lookup')
-  
-  if (params.functionHashes?.length) {
-    url.searchParams.set('function', params.functionHashes.join(','))
-  }
-  
-  if (params.eventHashes?.length) {
-    url.searchParams.set('event', params.eventHashes.join(','))
-  }
-  
-  if (params.filter !== undefined) {
-    url.searchParams.set('filter', params.filter.toString())
-  }
+	const url = new URL("https://api.openchain.xyz/signature-database/v1/lookup");
 
-  const response = await fetch(url.toString())
-  
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText}`)
-  }
-  
-  return response.json()
-}
+	if (params.functionHashes?.length) {
+		url.searchParams.set("function", params.functionHashes.join(","));
+	}
+
+	if (params.eventHashes?.length) {
+		url.searchParams.set("event", params.eventHashes.join(","));
+	}
+
+	if (params.filter !== undefined) {
+		url.searchParams.set("filter", params.filter.toString());
+	}
+
+	const response = await fetch(url.toString());
+
+	if (!response.ok) {
+		throw new Error(
+			`API request failed: ${response.status} ${response.statusText}`,
+		);
+	}
+
+	return response.json();
+};
 
 // Custom hook
 export const useSignatureLookup = (
-  params: LookupParams,
-  options?: Omit<QueryOptions<ApiResponse, Error>, 'queryKey' | 'queryFn'>
+	params: LookupParams,
+	options?: Omit<QueryOptions<ApiResponse, Error>, "queryKey" | "queryFn">,
 ) => {
-  return useQuery({
-    queryKey: ['signature-lookup', params],
-    queryFn: () => lookupSignatures(params),
-    enabled: !!(params.functionHashes?.length || params.eventHashes?.length),
-    staleTime: Infinity, // 5 minutes
-    ...options,
-  })
-}
+	return useQuery({
+		queryKey: ["signature-lookup", params],
+		queryFn: () => lookupSignatures(params),
+		enabled: !!(params.functionHashes?.length || params.eventHashes?.length),
+		staleTime: Number.POSITIVE_INFINITY, // 5 minutes
+		...options,
+	});
+};
 
 // Helper hook for function signatures only
 export const useFunctionSignatureLookup = (
-  functionHashes: string[],
-  filter = true,
-  options?: Omit<QueryOptions<ApiResponse, Error>, 'queryKey' | 'queryFn'>
+	functionHashes: string[],
+	filter = true,
+	options?: Omit<QueryOptions<ApiResponse, Error>, "queryKey" | "queryFn">,
 ) => {
-  return useSignatureLookup(
-    { functionHashes, filter },
-    options
-  )
-}
+	return useSignatureLookup({ functionHashes, filter }, options);
+};
 
 // Helper hook for event signatures only
 export const useEventSignatureLookup = (
-  eventHashes: string[],
-  filter = true,
-  options?: Omit<QueryOptions<ApiResponse, Error>, 'queryKey' | 'queryFn'>
+	eventHashes: string[],
+	filter = true,
+	options?: Omit<QueryOptions<ApiResponse, Error>, "queryKey" | "queryFn">,
 ) => {
-  return useSignatureLookup(
-    { eventHashes, filter },
-    options
-  )
-}
+	return useSignatureLookup({ eventHashes, filter }, options);
+};
 
 // Example usage:
 /*
