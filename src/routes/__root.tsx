@@ -5,10 +5,13 @@ import {
   createRootRoute,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import Header from '../components/Header'
 
 import appCss from '../styles.css?url'
+
+const queryClient = new QueryClient();
 
 export const Route = createRootRoute({
   head: () => ({
@@ -33,12 +36,14 @@ export const Route = createRootRoute({
   }),
 
   component: () => (
-    <RootDocument>
-      <Header />
+    <QueryClientProvider client={queryClient}>
+      <RootDocument>
+        <Header />
 
-      <Outlet />
-      <TanStackRouterDevtools />
-    </RootDocument>
+        <Outlet />
+        <TanStackRouterDevtools />
+      </RootDocument>
+    </QueryClientProvider>
   ),
 })
 
