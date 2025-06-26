@@ -1,11 +1,10 @@
+import { useSignatureLookup } from "@/lib/hooks/useSignatureLookup";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AbiError, AbiFunction, AbiParameters } from "ox";
+import { AbiError, AbiFunction, type AbiItem, AbiParameters } from "ox";
+import type { Parameter } from "ox/AbiParameters";
 import { useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
-import {
-	useSignatureLookup,
-} from "../lib/hooks/useSignatureLookup";
 import { Button } from "./ui/button";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "./ui/form";
 import { Input } from "./ui/input";
@@ -24,8 +23,7 @@ export default function Decoder() {
 	const hex = useWatch({ control: sigForm.control, name: "hex" });
 	const [sigError, setSigError] = useState<string | null>(null);
 	const [decodeError, setDecodeError] = useState<string | null>(null);
-	const [decoded, setDecoded] = useState<any[] | null>(null);
-	const [usedSig] = useState<string | null>(null);
+	const [decoded, setDecoded] = useState<unknown[] | null>(null);
 
 	// Extract function selector (first 10 chars)
 	let selector = "";
@@ -34,11 +32,9 @@ export default function Decoder() {
 	}
 
 	// Only lookup if no signature entered and selector present
-	const shouldLookup = !sig && selector.length === 10;
-	const { data: sigData, isLoading: isLookupLoading } = useSignatureLookup(
-		{ functionHashes: selector ? [selector] : [] },
-		{ enabled: shouldLookup } as any,
-	);
+	const { data: sigData, isLoading: isLookupLoading } = useSignatureLookup({
+		functionHashes: selector ? [selector] : [],
+	});
 
 	// If user picks a fetched signature, set it in the form
 	function handlePickSignature(s: string) {
@@ -48,18 +44,23 @@ export default function Decoder() {
 	// Determine which signature to use for decoding
 	const effectiveSig =
 		sig ||
-		(usedSig
-			? usedSig
-			: sigData &&
-				sigData.result.function &&
-				Object.values(sigData.result.function).flat()[0]?.name) ||
+		(sigData?.result.function &&
+			Object.values(sigData.result.function).flat()[0]?.name) ||
 		"";
 
 	// Parse signature (function, error, or tuple)
-	const abiObj = useMemo<any | null>(() => {
+	type AbiObj =
+		| ReturnType<typeof AbiItem.from>
+		| Extract<Parameter, { components: readonly Parameter[] }>
+		| null;
+
+	const abiObj = useMemo<
+		| ReturnType<typeof AbiItem.from>
+		| Extract<Parameter, { components: readonly Parameter[] }>
+		| null
+	>(() => {
 		setSigError(null);
 		if (!effectiveSig) return null;
-
 		try {
 			const parsed = JSON.parse(effectiveSig);
 			if (Array.isArray(parsed)) {
@@ -70,11 +71,15 @@ export default function Decoder() {
 					if (fn) return fn;
 				}
 				// Otherwise, use the first function
-				const fn = AbiFunction.fromAbi(parsed, parsed.find((x) => x.type === "function")?.name || "");
+				const fn = AbiFunction.fromAbi(
+					parsed,
+					parsed.find((x) => x.type === "function")?.name || "",
+				);
 				if (fn) return fn;
 				setSigError("No function found in ABI array");
 				return null;
-			} else if (typeof parsed === "object" && parsed !== null) {
+			}
+			if (typeof parsed === "object" && parsed !== null) {
 				if (parsed.type === "function") return AbiFunction.from(parsed);
 				setSigError("ABI object must be function");
 				return null;
@@ -85,6 +90,7 @@ export default function Decoder() {
 
 		let prefix = "";
 		let rest = effectiveSig.trim();
+
 		const match = rest.match(/^(function|error)\s+/i);
 		if (match) {
 			prefix = match[1].toLowerCase();
@@ -93,62 +99,61 @@ export default function Decoder() {
 		// Tuple mode
 		const tupleMatch = rest.match(/^\(([^)]*)\)$/);
 		if (!prefix && tupleMatch) {
-			try {
-				let types = tupleMatch[1]
-					.split(",")
-					.map((s) => s.trim())
-					.filter(Boolean);
-				types = types.map((t) =>
-					t === "uint" ? "uint256" : t === "int" ? "int256" : t,
-				);
-				types = types.filter(
-					(t) => t && typeof t === "string" && /^[a-zA-Z0-9_\[\]]+$/.test(t),
-				);
-				if (!types.length) throw new Error("No types found");
-				const params = AbiParameters.from(types);
-				if (
-					!Array.isArray(params) ||
-					!params.every(
-						(p: any) => typeof p === "object" && typeof p.type === "string",
-					)
-				) {
-					throw new Error("Invalid parameter types");
-				}
-				return { type: "tuple", params, types };
-			} catch (e: any) {
-				setSigError(e.message || "Invalid parameter tuple");
-				return null;
-			}
+			// handling tuple params
+			return AbiParameters.from(rest)[0];
 		}
 		try {
 			if (prefix === "error") {
-				const err = AbiError.from("error " + rest);
+				const err = AbiError.from(`error ${rest}` as string);
 				if (err.type !== "error") throw new Error("Not an error signature");
 				return err;
-			} else {
-				const fn = AbiFunction.from("function " + rest);
-				if (fn.type !== "function") throw new Error("Not a function signature");
-				return fn;
 			}
-		} catch (e: any) {
-			setSigError(e.message || "Invalid signature");
+			const fn = AbiFunction.from(`function ${rest}` as string);
+			if (fn.type !== "function") throw new Error("Not a function signature");
+			return fn;
+		} catch (e) {
+			setSigError(e instanceof Error ? e.message : "Invalid signature");
 			return null;
 		}
-	}, [effectiveSig]);
+	}, [effectiveSig, selector]);
+
+	// Type guards
+	function isAbiFunction(obj: AbiObj) {
+		return !!obj && "type" in obj && obj.type === "function";
+	}
+	function isAbiError(obj: AbiObj) {
+		return !!obj && "type" in obj && obj.type === "error";
+	}
+
+	function isTupleObj(obj: AbiObj) {
+		console.log(!!obj && "components" in obj);
+		return !!obj && "components" in obj;
+	}
 
 	// Param fields for display
-	let paramFields: (any & { name: string })[] = [];
+	type ParamField = { name: string; type: string };
+	let paramFields: ParamField[] = [];
 	if (abiObj) {
-		if (abiObj.type === "tuple" && Array.isArray(abiObj.types)) {
-			paramFields = abiObj.types.map((type: string, idx: number) => ({
-				name: `arg${idx}`,
+		if (isTupleObj(abiObj)) {
+			paramFields = abiObj.components.map(({ name, type }, idx: number) => ({
+				name: name || `arg${idx}`,
 				type,
 			}));
-		} else if (Array.isArray(abiObj.inputs)) {
-			paramFields = abiObj.inputs.map((input: any, idx: number) => ({
-				...input,
-				name: input.name || `arg${idx}`,
-			}));
+			// } else if (abiObj&&'type' in abiObj && abiObj.type === 'function') {
+		} else if (isAbiFunction(abiObj)) {
+			paramFields = abiObj.inputs.map(
+				(input: { name?: string; type: string }, idx: number) => ({
+					name: input.name || `arg${idx}`,
+					type: input.type,
+				}),
+			);
+		} else if (isAbiError(abiObj)) {
+			paramFields = abiObj.inputs.map(
+				(input: { name?: string; type: string }, idx: number) => ({
+					name: input.name || `arg${idx}`,
+					type: input.type,
+				}),
+			);
 		}
 	}
 
@@ -171,19 +176,20 @@ export default function Decoder() {
 		}
 		const hexTyped = hexVal as `0x${string}`;
 		try {
-			let values: any[] = [];
-			if (abiObj.type === "function") {
-				values = AbiFunction.decodeData(abiObj, hexTyped) ?? [];
-			} else if (abiObj.type === "error") {
+			let values: unknown[] = [];
+			if (isAbiFunction(abiObj)) {
+				const res = AbiFunction.decodeData(abiObj, hexTyped) ?? [];
+				values = Array.isArray(res) ? res : [res];
+			} else if (isAbiError(abiObj)) {
 				const res = AbiError.decode(abiObj, hexTyped);
 				values = Array.isArray(res) ? res : [res];
-			} else if (abiObj.type === "tuple") {
-				const res = AbiParameters.decode(abiObj.params, hexTyped);
+			} else if (isTupleObj(abiObj)) {
+				const res = AbiParameters.decode(abiObj.components, hexTyped);
 				values = Array.isArray(res) ? res : [res];
 			}
-			setDecoded(values ?? []);
-		} catch (e: any) {
-			setDecodeError(e.message || "Decoding error");
+			setDecoded(values);
+		} catch (e: unknown) {
+			setDecodeError(e instanceof Error ? e.message : "Decoding error");
 		}
 	}
 
@@ -208,7 +214,6 @@ export default function Decoder() {
 										{...field}
 										placeholder="Hex data to decode (0x...)"
 										autoComplete="off"
-										
 									/>
 								</FormControl>
 								<FormMessage />
@@ -223,24 +228,27 @@ export default function Decoder() {
 									Looking up possible signatures...
 								</div>
 							)}
-							{sigData && sigData.result.function && (
+							{sigData?.result.function && (
 								<div className="flex flex-col gap-2">
 									<div className="text-xs text-muted-foreground">
 										Possible signatures from selector:
 									</div>
 									{Object.values(sigData.result.function)
 										.flat()
-										.filter((item) => item && item.name)
-										.map((item, idx) => (
-											<button
-												key={item!.name + idx}
-												className="text-xs text-blue-600 underline text-left hover:text-blue-800"
-												type="button"
-												onClick={() => handlePickSignature(item!.name)}
-											>
-												{item!.name}
-											</button>
-										))}
+										.filter((item) => item?.name)
+										.map(
+											(item, idx) =>
+												item && (
+													<button
+														key={idx}
+														className="text-xs text-blue-600 underline text-left hover:text-blue-800"
+														type="button"
+														onClick={() => handlePickSignature(item.name)}
+													>
+														{item?.name}
+													</button>
+												),
+										)}
 								</div>
 							)}
 						</>
@@ -269,15 +277,19 @@ export default function Decoder() {
 
 			{decodeError && <div className="text-red-500 text-sm">{decodeError}</div>}
 			{sigError && <div className="text-red-500 text-sm">{sigError}</div>}
-			{
-				abiObj && (
-					<div className="flex flex-col gap-2">
-						<div className="text-xs text-muted-foreground">
-						<span className="font-mono text-black">{abiObj.format ? abiObj.format("sighash") : (abiObj.name + '(' + (abiObj.inputs?.map((i:any) => i.type).join(',') || '') + ')')}</span>
-						</div>
+			{abiObj && (
+				<div className="flex flex-col gap-2">
+					<div className="text-xs text-muted-foreground">
+						<span className="font-mono text-black">
+							{isAbiFunction(abiObj) || isAbiError(abiObj)
+								? `${abiObj.name}(${abiObj.inputs?.map((i) => i.type).join(",") || ""})`
+								: isTupleObj(abiObj)
+									? `(${abiObj.components?.map((i) => i.type).join(",") || ""})`
+									: ""}
+						</span>
 					</div>
-				)
-			}
+				</div>
+			)}
 			{decoded && paramFields.length > 0 && (
 				<div className="flex flex-col gap-2">
 					{paramFields.map((field, idx) => (

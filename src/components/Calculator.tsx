@@ -85,7 +85,7 @@ const Calculator = () => {
 				}
 			}
 		}
-	}, [binary, decimal, hex, lastChanged, setValue]);
+	}, [binary, decimal, hex, setValue]);
 
 	const handleClear = () => {
 		reset();

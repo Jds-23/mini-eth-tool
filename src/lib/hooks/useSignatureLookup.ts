@@ -54,10 +54,12 @@ export const useSignatureLookup = (
 	params: LookupParams,
 	options?: Omit<QueryOptions<ApiResponse, Error>, "queryKey" | "queryFn">,
 ) => {
+	const shouldLookup =
+		!!params.functionHashes?.length && params.functionHashes[0].length === 10;
 	return useQuery({
 		queryKey: ["signature-lookup", params],
 		queryFn: () => lookupSignatures(params),
-		enabled: !!(params.functionHashes?.length || params.eventHashes?.length),
+		enabled: shouldLookup,
 		staleTime: Number.POSITIVE_INFINITY, // 5 minutes
 		...options,
 	});

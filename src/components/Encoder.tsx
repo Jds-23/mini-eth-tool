@@ -1,6 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Copy } from "lucide-react";
-import { AbiError, AbiEvent, AbiFunction, AbiParameters } from "ox";
+import {
+	AbiError,
+	AbiEvent,
+	AbiFunction,
+	type AbiItem,
+	AbiParameters,
+} from "ox";
+import type { Parameter } from "ox/AbiParameters";
 import { useMemo, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -22,9 +29,36 @@ export default function Encoder() {
 	const [sigError, setSigError] = useState<string | null>(null);
 
 	// Parse function signature with ox
-	const abiObj = useMemo<any | null>(() => {
+	const abiObj = useMemo<
+		| ReturnType<typeof AbiItem.from>
+		| Extract<Parameter, { components: readonly Parameter[] }>
+		| null
+	>(() => {
 		setSigError(null);
 		if (!sig) return null;
+		// try {
+		// 	const parsed = JSON.parse(effectiveSig);
+		// 	if (Array.isArray(parsed)) {
+		// 		// If user provided a selector, try to find by selector, else by name
+		// 		if (selector) {
+		// 			// Find function by selector
+		// 			const fn = AbiFunction.fromAbi(parsed, selector);
+		// 			if (fn) return fn;
+		// 		}
+		// 		// Otherwise, use the first function
+		// 		const fn = AbiFunction.fromAbi(parsed, parsed.find((x) => x.type === "function")?.name || "");
+		// 		if (fn) return fn;
+		// 		setSigError("No function found in ABI array");
+		// 		return null;
+		// 	} else if (typeof parsed === "object" && parsed !== null) {
+		// 		if (parsed.type === "function") return AbiFunction.from(parsed);
+		// 		setSigError("ABI object must be function");
+		// 		return null;
+		// 	}
+		// } catch (e) {
+		// 	// Not JSON, fallback to string parsing
+		// }
+
 		let prefix = "";
 		let rest = sig.trim();
 		const match = rest.match(/^(function|event|error)\s+/i);
@@ -35,73 +69,76 @@ export default function Encoder() {
 		// If input is a tuple of types, e.g. (uint,address)
 		const tupleMatch = rest.match(/^\(([^)]*)\)$/);
 		if (!prefix && tupleMatch) {
-			try {
-				let types = tupleMatch[1]
-					.split(",")
-					.map((s) => s.trim())
-					.filter(Boolean);
-				// Canonicalize types: uint -> uint256, int -> int256
-				types = types.map((t) =>
-					t === "uint" ? "uint256" : t === "int" ? "int256" : t,
-				);
-				// Filter out any empty or invalid types
-				types = types.filter(
-					(t) => t && typeof t === "string" && /^[a-zA-Z0-9_\[\]]+$/.test(t),
-				);
-				if (!types.length) throw new Error("No types found");
-				const params = AbiParameters.from(types);
-				// Ensure params is an array of objects with a type property
-				if (
-					!Array.isArray(params) ||
-					!params.every(
-						(p: any) => typeof p === "object" && typeof p.type === "string",
-					)
-				) {
-					throw new Error("Invalid parameter types");
-				}
-				return { type: "tuple", params, types };
-			} catch (e: any) {
-				setSigError(e.message || "Invalid parameter tuple");
-				return null;
-			}
+			// handling tuple params
+			return AbiParameters.from(rest)[0] as Extract<
+				Parameter,
+				{ components: readonly Parameter[] }
+			>; // better approach?
 		}
 		try {
 			if (prefix === "event") {
-				const ev = AbiEvent.from("event " + rest);
+				const ev = AbiEvent.from(`event ${rest}` as string);
 				if (ev.type !== "event") throw new Error("Not an event signature");
 				return ev;
-			} else if (prefix === "error") {
-				const err = AbiError.from("error " + rest);
+			}
+			if (prefix === "error") {
+				const err = AbiError.from(`error ${rest}` as string);
 				if (err.type !== "error") throw new Error("Not an error signature");
 				return err;
-			} else {
-				// Default to function
-				const fn = AbiFunction.from("function " + rest);
-				if (fn.type !== "function") throw new Error("Not a function signature");
-				return fn;
 			}
-		} catch (e: any) {
-			setSigError(e.message || "Invalid signature");
+			// Default to function
+			const fn = AbiFunction.from(`function ${rest}` as string);
+			if (fn.type !== "function") throw new Error("Not a function signature");
+			return fn;
+		} catch (e) {
+			setSigError(e instanceof Error ? e.message : "Invalid signature");
 			return null;
 		}
 	}, [sig]);
 
+	// Type guards
+	function isAbiFunction(
+		obj:
+			| ReturnType<typeof AbiItem.from>
+			| Extract<Parameter, { components: readonly Parameter[] }>
+			| null,
+	) {
+		return !!obj && "type" in obj && obj.type === "function";
+	}
+	function isAbiError(
+		obj:
+			| ReturnType<typeof AbiItem.from>
+			| Extract<Parameter, { components: readonly Parameter[] }>
+			| null,
+	) {
+		return !!obj && "type" in obj && obj.type === "error";
+	}
+
+	function isTupleObj(
+		obj:
+			| ReturnType<typeof AbiItem.from>
+			| Extract<Parameter, { components: readonly Parameter[] }>
+			| null,
+	) {
+		return !!obj && "components" in obj;
+	}
+
 	// Step 2: Dynamic param form
-	let paramFields: (any & { name: string })[] = [];
+	let paramFields: { name: string; type: string }[] = [];
 	if (abiObj) {
-		if (abiObj.type === "tuple" && Array.isArray(abiObj.types)) {
-			paramFields = abiObj.types.map((type: string, idx: number) => ({
-				name: `arg${idx}`,
+		if (isTupleObj(abiObj)) {
+			paramFields = abiObj.components.map(({ name, type }, idx) => ({
+				name: name || `arg${idx}`,
 				type,
 			}));
-		} else if (Array.isArray(abiObj.inputs)) {
-			paramFields = abiObj.inputs.map((input: any, idx: number) => ({
+		} else if (isAbiFunction(abiObj) || isAbiError(abiObj)) {
+			paramFields = abiObj.inputs.map((input, idx) => ({
 				...input,
 				name: input.name || `arg${idx}`,
 			}));
 		}
 	}
-	const paramShape: Record<string, any> = {};
+	const paramShape: Record<string, z.ZodType> = {};
 	paramFields.forEach((input, idx) => {
 		paramShape[input.name] = z.string().min(1, "Required");
 	});
@@ -132,35 +169,30 @@ export default function Encoder() {
 				const hex = AbiError.encode(abiObj, args);
 				setEncoded(hex);
 			} else if (abiObj.type === "tuple") {
-				if (
-					!Array.isArray(abiObj.params) ||
-					!abiObj.params.every(
-						(p: any) => typeof p === "object" && typeof p.type === "string",
-					)
-				) {
-					setSigError("Invalid parameter types for encoding");
-					setEncoded("");
-					return;
-				}
 				let hex = "";
 				if (usePacked) {
 					try {
-						hex = AbiParameters.encodePacked(abiObj.params, args);
-					} catch (e: any) {
+						hex = AbiParameters.encodePacked(
+							abiObj.components.map((c) => c.type),
+							args,
+						);
+					} catch (e) {
 						setSigError(
-							e.message || "encodePacked error: check types and values",
+							e instanceof Error
+								? e.message
+								: "encodePacked error: check types and values",
 						);
 						setEncoded("");
 						return;
 					}
 				} else {
-					hex = AbiParameters.encode(abiObj.params, args);
+					hex = AbiParameters.encode(abiObj.components, args);
 				}
 				setEncoded(hex);
 			}
-		} catch (e: any) {
+		} catch (e) {
 			setEncoded("");
-			setSigError(e.message || "Encoding error");
+			setSigError(e instanceof Error ? e.message : "Encoding error");
 		}
 	}
 
@@ -237,7 +269,7 @@ export default function Encoder() {
 								key={field.name}
 								control={paramForm.control}
 								name={field.name}
-								render={({ field: f }: { field: any }) => (
+								render={({ field: f }) => (
 									<FormItem>
 										<FormControl>
 											<Input
@@ -305,14 +337,14 @@ export default function Encoder() {
 						</div>
 					</div>
 				)}
-			{abiObj?.type === "event" && (
+			{/* {abiObj?.type === "event" && (
 				<div className="flex flex-col gap-2">
 					<div className="text-xs text-muted-foreground">
 						Event topic hash (topic0):
 					</div>
-					<Input type="text" readOnly value={abiObj.topicHash || ""} />
+					<Input type="text" readOnly value={abiObj. || ""} />
 				</div>
-			)}
+			)} */}
 		</div>
 	);
 }
