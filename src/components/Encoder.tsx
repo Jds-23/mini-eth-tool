@@ -139,9 +139,9 @@ export default function Encoder() {
 		}
 	}
 	const paramShape: Record<string, z.ZodType> = {};
-	paramFields.forEach((input, idx) => {
+	for (const input of paramFields) {
 		paramShape[input.name] = z.string().min(1, "Required");
-	});
+	}
 	const paramSchema = z.object(paramShape);
 	const paramForm = useForm({
 		resolver: zodResolver(paramSchema),
@@ -151,7 +151,7 @@ export default function Encoder() {
 		}, {}),
 		mode: "onChange",
 	});
-	const paramValues = useWatch({ control: paramForm.control });
+	// const paramValues = useWatch({ control: paramForm.control });
 	const [encoded, setEncoded] = useState<string | null>(null);
 	const [usePacked, setUsePacked] = useState(false);
 	const [copied, setCopied] = useState(false);
@@ -264,7 +264,7 @@ export default function Encoder() {
 						className="flex flex-col gap-4"
 						onSubmit={paramForm.handleSubmit(handleEncode)}
 					>
-						{paramFields.map((field, idx) => (
+						{paramFields.map((field) => (
 							<FormField
 								key={field.name}
 								control={paramForm.control}
