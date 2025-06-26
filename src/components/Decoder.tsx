@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import {
-	type SignatureItem,
 	useSignatureLookup,
 } from "../lib/hooks/useSignatureLookup";
 import { Button } from "./ui/button";
@@ -60,6 +59,30 @@ export default function Decoder() {
 	const abiObj = useMemo<any | null>(() => {
 		setSigError(null);
 		if (!effectiveSig) return null;
+
+		try {
+			const parsed = JSON.parse(effectiveSig);
+			if (Array.isArray(parsed)) {
+				// If user provided a selector, try to find by selector, else by name
+				if (selector) {
+					// Find function by selector
+					const fn = AbiFunction.fromAbi(parsed, selector);
+					if (fn) return fn;
+				}
+				// Otherwise, use the first function
+				const fn = AbiFunction.fromAbi(parsed, parsed.find((x) => x.type === "function")?.name || "");
+				if (fn) return fn;
+				setSigError("No function found in ABI array");
+				return null;
+			} else if (typeof parsed === "object" && parsed !== null) {
+				if (parsed.type === "function") return AbiFunction.from(parsed);
+				setSigError("ABI object must be function");
+				return null;
+			}
+		} catch (e) {
+			// Not JSON, fallback to string parsing
+		}
+
 		let prefix = "";
 		let rest = effectiveSig.trim();
 		const match = rest.match(/^(function|error)\s+/i);
@@ -185,6 +208,7 @@ export default function Decoder() {
 										{...field}
 										placeholder="Hex data to decode (0x...)"
 										autoComplete="off"
+										
 									/>
 								</FormControl>
 								<FormMessage />
@@ -229,7 +253,8 @@ export default function Decoder() {
 								<FormControl>
 									<Textarea
 										{...field}
-										placeholder="Signature: approve(address,uint) or (uint,address)"
+										placeholder="Signature: approve(address,uint) or (uint,address) or ABI"
+										className="max-h-48 overflow-auto"
 									/>
 								</FormControl>
 								<FormMessage />
@@ -244,6 +269,15 @@ export default function Decoder() {
 
 			{decodeError && <div className="text-red-500 text-sm">{decodeError}</div>}
 			{sigError && <div className="text-red-500 text-sm">{sigError}</div>}
+			{
+				abiObj && (
+					<div className="flex flex-col gap-2">
+						<div className="text-xs text-muted-foreground">
+						<span className="font-mono text-black">{abiObj.format ? abiObj.format("sighash") : (abiObj.name + '(' + (abiObj.inputs?.map((i:any) => i.type).join(',') || '') + ')')}</span>
+						</div>
+					</div>
+				)
+			}
 			{decoded && paramFields.length > 0 && (
 				<div className="flex flex-col gap-2">
 					{paramFields.map((field, idx) => (

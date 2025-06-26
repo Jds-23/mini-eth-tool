@@ -226,7 +226,7 @@ export default function Encoder() {
 				</form>
 			</Form>
 			{sigError && <div className="text-red-500 text-sm">{sigError}</div>}
-			{abiObj && paramFields.length > 0 && (
+			{abiObj && (
 				<Form {...paramForm}>
 					<form
 						className="flex flex-col gap-4"
