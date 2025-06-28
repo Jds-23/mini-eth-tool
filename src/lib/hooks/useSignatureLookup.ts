@@ -54,8 +54,13 @@ export const useSignatureLookup = (
 	params: LookupParams,
 	options?: Omit<QueryOptions<ApiResponse, Error>, "queryKey" | "queryFn">,
 ) => {
-	const shouldLookup =
-		!!params.functionHashes?.length && params.functionHashes[0].length === 10;
+       const hasFunctionSelector =
+               !!params.functionHashes?.length &&
+               params.functionHashes[0].length === 10;
+       const hasEventTopic =
+               !!params.eventHashes?.length &&
+               params.eventHashes[0].length === 66;
+       const shouldLookup = hasFunctionSelector || hasEventTopic;
 	return useQuery({
 		queryKey: ["signature-lookup", params],
 		queryFn: () => lookupSignatures(params),
