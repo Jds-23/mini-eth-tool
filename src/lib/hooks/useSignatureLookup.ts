@@ -54,21 +54,19 @@ export const useSignatureLookup = (
 	params: LookupParams,
 	options?: Omit<QueryOptions<ApiResponse, Error>, "queryKey" | "queryFn">,
 ) => {
-       const hasFunctionSelector =
-               !!params.functionHashes?.length &&
-               params.functionHashes[0].length === 10;
-       const hasEventTopic =
-               !!params.eventHashes?.length &&
-               params.eventHashes[0].length === 66;
-       const shouldLookup = hasFunctionSelector || hasEventTopic;
+	const hasFunctionSelector =
+		!!params.functionHashes?.length && params.functionHashes[0].length === 10;
+	const hasEventTopic =
+		!!params.eventHashes?.length && params.eventHashes[0].length === 66;
+	const shouldLookup = hasFunctionSelector || hasEventTopic;
 	return useQuery({
 		queryKey: ["signature-lookup", params],
 		queryFn: () => lookupSignatures(params),
 		enabled: shouldLookup,
-                // Cache results indefinitely since signature data rarely changes
-                staleTime: Number.POSITIVE_INFINITY,
-                ...options,
-        });
+		// Cache results indefinitely since signature data rarely changes
+		staleTime: Number.POSITIVE_INFINITY,
+		...options,
+	});
 };
 
 // Helper hook for function signatures only

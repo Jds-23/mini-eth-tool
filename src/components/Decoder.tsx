@@ -55,38 +55,38 @@ export default function Decoder() {
 		| Extract<Parameter, { components: readonly Parameter[] }>
 		| null;
 
-       const abiObj = useMemo<
-               | ReturnType<typeof AbiItem.from>
-               | Extract<Parameter, { components: readonly Parameter[] }>
-               | null
-       >(() => {
-               setSigError(null);
-               if (!effectiveSig) return null;
-               try {
-                       const parsed = JSON.parse(effectiveSig);
-                       if (Array.isArray(parsed)) {
-                               const item = fullAbi.fromAbi(parsed, selector || undefined);
-                               if (item) return item;
-                               setSigError("No matching item in ABI array");
-                               return null;
-                       }
-                       if (typeof parsed === "object" && parsed !== null) {
-                               const item = fullAbi.fromAbi(parsed as Record<string, unknown>);
-                               if (item) return item;
-                               setSigError("Invalid ABI object");
-                               return null;
-                       }
-               } catch {
-                       // not JSON
-               }
+	const abiObj = useMemo<
+		| ReturnType<typeof AbiItem.from>
+		| Extract<Parameter, { components: readonly Parameter[] }>
+		| null
+	>(() => {
+		setSigError(null);
+		if (!effectiveSig) return null;
+		try {
+			const parsed = JSON.parse(effectiveSig);
+			if (Array.isArray(parsed)) {
+				const item = fullAbi.fromAbi(parsed, selector || undefined);
+				if (item) return item;
+				setSigError("No matching item in ABI array");
+				return null;
+			}
+			if (typeof parsed === "object" && parsed !== null) {
+				const item = fullAbi.fromAbi(parsed as Record<string, unknown>);
+				if (item) return item;
+				setSigError("Invalid ABI object");
+				return null;
+			}
+		} catch {
+			// not JSON
+		}
 
-               try {
-                       return fullAbi.from(effectiveSig);
-               } catch (e) {
-                       setSigError(e instanceof Error ? e.message : "Invalid signature");
-                       return null;
-               }
-       }, [effectiveSig, selector]);
+		try {
+			return fullAbi.from(effectiveSig);
+		} catch (e) {
+			setSigError(e instanceof Error ? e.message : "Invalid signature");
+			return null;
+		}
+	}, [effectiveSig, selector]);
 
 	// Type guards
 	function isAbiFunction(obj: AbiObj) {
