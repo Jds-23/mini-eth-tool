@@ -1,7 +1,7 @@
 import { fullAbi } from "@/lib/full-abi";
 import { useSignatureLookup } from "@/lib/hooks/useSignatureLookup";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AbiFunction, type AbiItem } from "ox";
+import type { AbiItem } from "ox";
 import type { Parameter } from "ox/AbiParameters";
 import { useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -65,28 +65,19 @@ export default function Decoder() {
 		try {
 			const parsed = JSON.parse(effectiveSig);
 			if (Array.isArray(parsed)) {
-				// If user provided a selector, try to find by selector, else by name
-				if (selector) {
-					// Find function by selector
-					const fn = AbiFunction.fromAbi(parsed, selector);
-					if (fn) return fn;
-				}
-				// Otherwise, use the first function
-				const fn = AbiFunction.fromAbi(
-					parsed,
-					parsed.find((x) => x.type === "function")?.name || "",
-				);
-				if (fn) return fn;
-				setSigError("No function found in ABI array");
+				const item = fullAbi.fromAbi(parsed, selector || undefined);
+				if (item) return item;
+				setSigError("No matching item in ABI array");
 				return null;
 			}
 			if (typeof parsed === "object" && parsed !== null) {
-				if (parsed.type === "function") return AbiFunction.from(parsed);
-				setSigError("ABI object must be function");
+				const item = fullAbi.fromAbi(parsed as Record<string, unknown>);
+				if (item) return item;
+				setSigError("Invalid ABI object");
 				return null;
 			}
-		} catch (e) {
-			// Not JSON, fallback to string parsing
+		} catch {
+			// not JSON
 		}
 
 		try {

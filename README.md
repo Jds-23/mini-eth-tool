@@ -29,6 +29,19 @@ pnpm test
 
 This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
 
+## ABI Utilities
+
+The `fullAbi` module contains helpers for working with Solidity ABIs. The new
+`fromAbi` function can extract an ABI item from an ABI array by name or by a
+4-byte selector.
+
+```ts
+import { fullAbi } from "@/lib/full-abi"
+
+const item = fullAbi.fromAbi(erc20Abi, "transfer")
+const bySelector = fullAbi.fromAbi(erc20Abi, "0xa9059cbb")
+```
+
 
 ## Linting & Formatting
 

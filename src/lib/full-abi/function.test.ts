@@ -1,12 +1,9 @@
-import { AbiFunction, AbiItem } from "ox";
+import { AbiFunction } from "ox";
 import { expect, test } from "vitest";
 import { fullAbi } from "./index";
 
 test("function", () => {
-	const abi = "error foo(uint256 a, uint256 b)" as const;
-	const rAbi = AbiItem.from(abi);
-	// const eAbi = AbiError.from(abi);
-	console.log(rAbi);
+	const abi = "function foo(uint256 a, uint256 b)" as const;
 	const abiItem = fullAbi.from(abi);
 	const params = fullAbi.getParameter(abiItem);
 	const encoded = fullAbi.encode(abiItem, ["1", "2"]);

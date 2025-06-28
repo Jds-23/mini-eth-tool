@@ -3,13 +3,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Copy } from "lucide-react";
 import type { AbiItem } from "ox";
 import type { Parameter } from "ox/AbiParameters";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "./ui/button";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "./ui/form";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 const funcSigSchema = z.string().min(1, "Required");
 
@@ -27,15 +28,47 @@ export default function Encoder() {
 	const [usePacked, setUsePacked] = useState(false);
 	const [copied, setCopied] = useState(false);
 	const copyTimeout = useRef<NodeJS.Timeout | null>(null);
+	const [abiItems, setAbiItems] = useState<AbiItem.AbiItem[] | null>(null);
+	const [selectedIndex, setSelectedIndex] = useState(0);
 
-	// Parse function signature with ox
+	// Parse signature or ABI JSON whenever input changes
+	useEffect(() => {
+		setSigError(null);
+		setEncoded(null);
+		setSelectedIndex(0);
+		try {
+			const parsed = JSON.parse(sig);
+			if (Array.isArray(parsed)) {
+				setAbiItems(parsed as AbiItem.AbiItem[]);
+				return;
+			}
+			if (typeof parsed === "object" && parsed !== null) {
+				setAbiItems([parsed as AbiItem.AbiItem]);
+				return;
+			}
+		} catch {
+			// ignore JSON parse errors
+		}
+		setAbiItems(null);
+	}, [sig]);
+
+	// Derive ABI item from signature or ABI JSON
 	const abiObj = useMemo<
 		| ReturnType<typeof AbiItem.from>
 		| Extract<Parameter, { components: readonly Parameter[] }>
 		| null
 	>(() => {
-		setSigError(null);
-		setEncoded(null);
+		if (abiItems) {
+			if (!abiItems.length) return null;
+			const item = abiItems[Math.min(selectedIndex, abiItems.length - 1)];
+			try {
+				return item;
+			} catch (e) {
+				setSigError(e instanceof Error ? e.message : "Invalid ABI item");
+				return null;
+			}
+		}
+
 		if (!sig) return null;
 		try {
 			return fullAbi.from(sig);
@@ -43,7 +76,7 @@ export default function Encoder() {
 			setSigError(e instanceof Error ? e.message : "Invalid signature");
 			return null;
 		}
-	}, [sig]);
+	}, [abiItems, selectedIndex, sig]);
 
 	// Step 2: Dynamic param form
 	const paramFields = useMemo(() => {
@@ -100,6 +133,7 @@ export default function Encoder() {
 								<FormControl>
 									<Textarea
 										{...field}
+										className="max-h-[100px] overflow-y-auto"
 										placeholder="Paste function signature, e.g. approve(address,uint256)"
 										onKeyDown={(e) => {
 											if (!field.onChange) return;
@@ -146,6 +180,23 @@ export default function Encoder() {
 				</form>
 			</Form>
 			{sigError && <div className="text-red-500 text-sm">{sigError}</div>}
+			{abiItems && abiItems.length > 1 && (
+				<Select
+					onValueChange={(value) => setSelectedIndex(Number(value))}
+				>
+					<SelectTrigger className="w-[280px]">
+        <SelectValue placeholder="Select a signature" />
+      </SelectTrigger>	
+					<SelectContent>
+						{abiItems.map((item, idx) => (
+							<SelectItem key={idx} value={idx.toString()}>
+								{"type" in item ? item.type : "item"}
+								{"name" in item && item.name ? ` ${item.name}` : ""}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+			)}
 			{abiObj && (
 				<Form {...paramForm}>
 					<form
