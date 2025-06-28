@@ -65,9 +65,10 @@ export const useSignatureLookup = (
 		queryKey: ["signature-lookup", params],
 		queryFn: () => lookupSignatures(params),
 		enabled: shouldLookup,
-		staleTime: Number.POSITIVE_INFINITY, // 5 minutes
-		...options,
-	});
+                // Cache results indefinitely since signature data rarely changes
+                staleTime: Number.POSITIVE_INFINITY,
+                ...options,
+        });
 };
 
 // Helper hook for function signatures only
