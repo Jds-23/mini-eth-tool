@@ -1,7 +1,7 @@
 import { fullAbi } from "@/lib/full-abi";
 import { useSignatureLookup } from "@/lib/hooks/useSignatureLookup";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AbiFunction, type AbiItem } from "ox";
+import type { AbiItem } from "ox";
 import type { Parameter } from "ox/AbiParameters";
 import { useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -55,47 +55,38 @@ export default function Decoder() {
 		| Extract<Parameter, { components: readonly Parameter[] }>
 		| null;
 
-	const abiObj = useMemo<
-		| ReturnType<typeof AbiItem.from>
-		| Extract<Parameter, { components: readonly Parameter[] }>
-		| null
-	>(() => {
-		setSigError(null);
-		if (!effectiveSig) return null;
-		try {
-			const parsed = JSON.parse(effectiveSig);
-			if (Array.isArray(parsed)) {
-				// If user provided a selector, try to find by selector, else by name
-				if (selector) {
-					// Find function by selector
-					const fn = AbiFunction.fromAbi(parsed, selector);
-					if (fn) return fn;
-				}
-				// Otherwise, use the first function
-				const fn = AbiFunction.fromAbi(
-					parsed,
-					parsed.find((x) => x.type === "function")?.name || "",
-				);
-				if (fn) return fn;
-				setSigError("No function found in ABI array");
-				return null;
-			}
-			if (typeof parsed === "object" && parsed !== null) {
-				if (parsed.type === "function") return AbiFunction.from(parsed);
-				setSigError("ABI object must be function");
-				return null;
-			}
-		} catch (e) {
-			// Not JSON, fallback to string parsing
-		}
+       const abiObj = useMemo<
+               | ReturnType<typeof AbiItem.from>
+               | Extract<Parameter, { components: readonly Parameter[] }>
+               | null
+       >(() => {
+               setSigError(null);
+               if (!effectiveSig) return null;
+               try {
+                       const parsed = JSON.parse(effectiveSig);
+                       if (Array.isArray(parsed)) {
+                               const item = fullAbi.fromAbi(parsed, selector || undefined);
+                               if (item) return item;
+                               setSigError("No matching item in ABI array");
+                               return null;
+                       }
+                       if (typeof parsed === "object" && parsed !== null) {
+                               const item = fullAbi.fromAbi(parsed as Record<string, unknown>);
+                               if (item) return item;
+                               setSigError("Invalid ABI object");
+                               return null;
+                       }
+               } catch {
+                       // not JSON
+               }
 
-		try {
-			return fullAbi.from(effectiveSig);
-		} catch (e) {
-			setSigError(e instanceof Error ? e.message : "Invalid signature");
-			return null;
-		}
-	}, [effectiveSig, selector]);
+               try {
+                       return fullAbi.from(effectiveSig);
+               } catch (e) {
+                       setSigError(e instanceof Error ? e.message : "Invalid signature");
+                       return null;
+               }
+       }, [effectiveSig, selector]);
 
 	// Type guards
 	function isAbiFunction(obj: AbiObj) {

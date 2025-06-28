@@ -1,10 +1,11 @@
 import {
-	AbiConstructor,
-	AbiError,
-	AbiEvent,
-	AbiFunction,
-	AbiParameters,
-	type Hex,
+        AbiConstructor,
+        AbiError,
+        AbiEvent,
+        AbiFunction,
+        AbiItem,
+        AbiParameters,
+        type Hex,
 } from "ox";
 import type { Parameter } from "ox/AbiParameters";
 import {
@@ -44,16 +45,52 @@ export function from(abiItem: string): from.ReturnType {
 }
 
 export declare namespace from {
-	type Options = {
-		prepare?: boolean;
-	};
+        type Options = {
+                prepare?: boolean;
+        };
 
 	type ReturnType =
 		| AbiEvent.AbiEvent
 		| AbiError.AbiError
 		| Extract<Parameter, { components: readonly Parameter[] }>
 		| AbiFunction.AbiFunction
-		| AbiConstructor.AbiConstructor;
+                | AbiConstructor.AbiConstructor;
+}
+
+export function fromAbi(
+        abi: readonly AbiItem.AbiItem[] | Record<string, unknown>,
+        identifier?: string,
+): from.ReturnType | null {
+        const items = Array.isArray(abi) ? abi : [abi as AbiItem.AbiItem];
+        if (!items.length) return null;
+
+        if (identifier) {
+                const selectorRegex = /^0x([0-9a-fA-F]{8})$/;
+                if (selectorRegex.test(identifier)) {
+                        try {
+                                return AbiFunction.fromAbi(
+                                        items as readonly AbiFunction.AbiFunction[],
+                                        identifier as Hex,
+                                ) as from.ReturnType;
+                        } catch {
+                                return null;
+                        }
+                }
+
+                const match = items.find(
+                        (i) => typeof i === "object" && "name" in i && i.name === identifier,
+                ) as AbiItem.AbiItem | undefined;
+                return match ? (from(JSON.stringify(match)) as from.ReturnType) : null;
+        }
+
+        const first = items.find(
+                (i) =>
+                        i &&
+                        typeof i === "object" &&
+                        "type" in i &&
+                        ["function", "event", "error", "constructor"].includes(i.type),
+        ) as AbiItem.AbiItem | undefined;
+        return first ? (from(JSON.stringify(first)) as from.ReturnType) : null;
 }
 
 export function getParameter(abiItem: from.ReturnType) {
