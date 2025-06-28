@@ -1,6 +1,7 @@
+import { fullAbi } from "@/lib/full-abi";
 import { useSignatureLookup } from "@/lib/hooks/useSignatureLookup";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AbiError, AbiFunction, type AbiItem, AbiParameters } from "ox";
+import { AbiFunction, type AbiItem } from "ox";
 import type { Parameter } from "ox/AbiParameters";
 import { useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -88,29 +89,8 @@ export default function Decoder() {
 			// Not JSON, fallback to string parsing
 		}
 
-		let prefix = "";
-		let rest = effectiveSig.trim();
-
-		const match = rest.match(/^(function|error)\s+/i);
-		if (match) {
-			prefix = match[1].toLowerCase();
-			rest = rest.slice(match[0].length);
-		}
-		// Tuple mode
-		const tupleMatch = rest.match(/^\(([^)]*)\)$/);
-		if (!prefix && tupleMatch) {
-			// handling tuple params
-			return AbiParameters.from(rest)[0];
-		}
 		try {
-			if (prefix === "error") {
-				const err = AbiError.from(`error ${rest}` as string);
-				if (err.type !== "error") throw new Error("Not an error signature");
-				return err;
-			}
-			const fn = AbiFunction.from(`function ${rest}` as string);
-			if (fn.type !== "function") throw new Error("Not a function signature");
-			return fn;
+			return fullAbi.from(effectiveSig);
 		} catch (e) {
 			setSigError(e instanceof Error ? e.message : "Invalid signature");
 			return null;
@@ -131,31 +111,14 @@ export default function Decoder() {
 	}
 
 	// Param fields for display
-	type ParamField = { name: string; type: string };
-	let paramFields: ParamField[] = [];
-	if (abiObj) {
-		if (isTupleObj(abiObj)) {
-			paramFields = abiObj.components.map(({ name, type }, idx: number) => ({
-				name: name || `arg${idx}`,
-				type,
-			}));
-			// } else if (abiObj&&'type' in abiObj && abiObj.type === 'function') {
-		} else if (isAbiFunction(abiObj)) {
-			paramFields = abiObj.inputs.map(
-				(input: { name?: string; type: string }, idx: number) => ({
-					name: input.name || `arg${idx}`,
-					type: input.type,
-				}),
-			);
-		} else if (isAbiError(abiObj)) {
-			paramFields = abiObj.inputs.map(
-				(input: { name?: string; type: string }, idx: number) => ({
-					name: input.name || `arg${idx}`,
-					type: input.type,
-				}),
-			);
-		}
-	}
+	const paramFields = useMemo(() => {
+		if (!abiObj) return [];
+		// @ts-expect-error
+		return fullAbi.getParameter(abiObj).map(({ name, type }, idx) => ({
+			name: name || `arg${idx}`,
+			type,
+		}));
+	}, [abiObj]);
 
 	// Decoding logic
 	function handleDecode() {
@@ -176,17 +139,9 @@ export default function Decoder() {
 		}
 		const hexTyped = hexVal as `0x${string}`;
 		try {
-			let values: unknown[] = [];
-			if (isAbiFunction(abiObj)) {
-				const res = AbiFunction.decodeData(abiObj, hexTyped) ?? [];
-				values = Array.isArray(res) ? res : [res];
-			} else if (isAbiError(abiObj)) {
-				const res = AbiError.decode(abiObj, hexTyped);
-				values = Array.isArray(res) ? res : [res];
-			} else if (isTupleObj(abiObj)) {
-				const res = AbiParameters.decode(abiObj.components, hexTyped);
-				values = Array.isArray(res) ? res : [res];
-			}
+			// @ts-expect-error
+			const values: unknown[] = fullAbi.decode(abiObj, hexTyped);
+
 			setDecoded(values);
 		} catch (e: unknown) {
 			setDecodeError(e instanceof Error ? e.message : "Decoding error");

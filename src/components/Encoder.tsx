@@ -1,12 +1,7 @@
+import { fullAbi } from "@/lib/full-abi";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Copy } from "lucide-react";
-import {
-	AbiError,
-	AbiEvent,
-	AbiFunction,
-	type AbiItem,
-	AbiParameters,
-} from "ox";
+import type { AbiItem } from "ox";
 import type { Parameter } from "ox/AbiParameters";
 import { useMemo, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -28,6 +23,11 @@ export default function Encoder() {
 	const sig = useWatch({ control: sigForm.control, name: "sig" });
 	const [sigError, setSigError] = useState<string | null>(null);
 
+	const [encoded, setEncoded] = useState<string | null>(null);
+	const [usePacked, setUsePacked] = useState(false);
+	const [copied, setCopied] = useState(false);
+	const copyTimeout = useRef<NodeJS.Timeout | null>(null);
+
 	// Parse function signature with ox
 	const abiObj = useMemo<
 		| ReturnType<typeof AbiItem.from>
@@ -35,109 +35,26 @@ export default function Encoder() {
 		| null
 	>(() => {
 		setSigError(null);
+		setEncoded(null);
 		if (!sig) return null;
-		// try {
-		// 	const parsed = JSON.parse(effectiveSig);
-		// 	if (Array.isArray(parsed)) {
-		// 		// If user provided a selector, try to find by selector, else by name
-		// 		if (selector) {
-		// 			// Find function by selector
-		// 			const fn = AbiFunction.fromAbi(parsed, selector);
-		// 			if (fn) return fn;
-		// 		}
-		// 		// Otherwise, use the first function
-		// 		const fn = AbiFunction.fromAbi(parsed, parsed.find((x) => x.type === "function")?.name || "");
-		// 		if (fn) return fn;
-		// 		setSigError("No function found in ABI array");
-		// 		return null;
-		// 	} else if (typeof parsed === "object" && parsed !== null) {
-		// 		if (parsed.type === "function") return AbiFunction.from(parsed);
-		// 		setSigError("ABI object must be function");
-		// 		return null;
-		// 	}
-		// } catch (e) {
-		// 	// Not JSON, fallback to string parsing
-		// }
-
-		let prefix = "";
-		let rest = sig.trim();
-		const match = rest.match(/^(function|event|error)\s+/i);
-		if (match) {
-			prefix = match[1].toLowerCase();
-			rest = rest.slice(match[0].length);
-		}
-		// If input is a tuple of types, e.g. (uint,address)
-		const tupleMatch = rest.match(/^\(([^)]*)\)$/);
-		if (!prefix && tupleMatch) {
-			// handling tuple params
-			return AbiParameters.from(rest)[0] as Extract<
-				Parameter,
-				{ components: readonly Parameter[] }
-			>; // better approach?
-		}
 		try {
-			if (prefix === "event") {
-				const ev = AbiEvent.from(`event ${rest}` as string);
-				if (ev.type !== "event") throw new Error("Not an event signature");
-				return ev;
-			}
-			if (prefix === "error") {
-				const err = AbiError.from(`error ${rest}` as string);
-				if (err.type !== "error") throw new Error("Not an error signature");
-				return err;
-			}
-			// Default to function
-			const fn = AbiFunction.from(`function ${rest}` as string);
-			if (fn.type !== "function") throw new Error("Not a function signature");
-			return fn;
+			return fullAbi.from(sig);
 		} catch (e) {
 			setSigError(e instanceof Error ? e.message : "Invalid signature");
 			return null;
 		}
 	}, [sig]);
 
-	// Type guards
-	function isAbiFunction(
-		obj:
-			| ReturnType<typeof AbiItem.from>
-			| Extract<Parameter, { components: readonly Parameter[] }>
-			| null,
-	) {
-		return !!obj && "type" in obj && obj.type === "function";
-	}
-	function isAbiError(
-		obj:
-			| ReturnType<typeof AbiItem.from>
-			| Extract<Parameter, { components: readonly Parameter[] }>
-			| null,
-	) {
-		return !!obj && "type" in obj && obj.type === "error";
-	}
-
-	function isTupleObj(
-		obj:
-			| ReturnType<typeof AbiItem.from>
-			| Extract<Parameter, { components: readonly Parameter[] }>
-			| null,
-	) {
-		return !!obj && "components" in obj;
-	}
-
 	// Step 2: Dynamic param form
-	let paramFields: { name: string; type: string }[] = [];
-	if (abiObj) {
-		if (isTupleObj(abiObj)) {
-			paramFields = abiObj.components.map(({ name, type }, idx) => ({
-				name: name || `arg${idx}`,
-				type,
-			}));
-		} else if (isAbiFunction(abiObj) || isAbiError(abiObj)) {
-			paramFields = abiObj.inputs.map((input, idx) => ({
-				...input,
-				name: input.name || `arg${idx}`,
-			}));
-		}
-	}
+	const paramFields = useMemo(() => {
+		if (!abiObj) return [];
+		// @ts-expect-error
+		return fullAbi.getParameter(abiObj).map(({ name, type }, idx) => ({
+			name: name || `arg${idx}`,
+			type,
+		}));
+	}, [abiObj]);
+
 	const paramShape: Record<string, z.ZodType> = {};
 	for (const input of paramFields) {
 		paramShape[input.name] = z.string().min(1, "Required");
@@ -152,44 +69,15 @@ export default function Encoder() {
 		mode: "onChange",
 	});
 	// const paramValues = useWatch({ control: paramForm.control });
-	const [encoded, setEncoded] = useState<string | null>(null);
-	const [usePacked, setUsePacked] = useState(false);
-	const [copied, setCopied] = useState(false);
-	const copyTimeout = useRef<NodeJS.Timeout | null>(null);
 
 	// Encode on submit
 	function handleEncode(data: Record<string, string>) {
 		if (!abiObj) return;
 		try {
 			const args = paramFields.map((f) => data[f.name]);
-			if (abiObj.type === "function") {
-				const hex = AbiFunction.encodeData(abiObj, args);
-				setEncoded(hex);
-			} else if (abiObj.type === "error") {
-				const hex = AbiError.encode(abiObj, args);
-				setEncoded(hex);
-			} else if (abiObj.type === "tuple") {
-				let hex = "";
-				if (usePacked) {
-					try {
-						hex = AbiParameters.encodePacked(
-							abiObj.components.map((c) => c.type),
-							args,
-						);
-					} catch (e) {
-						setSigError(
-							e instanceof Error
-								? e.message
-								: "encodePacked error: check types and values",
-						);
-						setEncoded("");
-						return;
-					}
-				} else {
-					hex = AbiParameters.encode(abiObj.components, args);
-				}
-				setEncoded(hex);
-			}
+			// @ts-expect-error
+			const hex = fullAbi.encode(abiObj, args, { packed: usePacked });
+			setEncoded(hex);
 		} catch (e) {
 			setEncoded("");
 			setSigError(e instanceof Error ? e.message : "Encoding error");
