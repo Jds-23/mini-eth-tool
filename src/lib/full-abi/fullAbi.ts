@@ -107,15 +107,19 @@ export function getParameter(abiItem: from.ReturnType) {
 	return [];
 }
 
-export function decode(abiItem: from.ReturnType, data: Hex.Hex) {
+export function decode(
+	abiItem: from.ReturnType,
+	data: Hex.Hex | { data?: Hex.Hex; topics: readonly Hex.Hex[] },
+) {
 	if ("type" in abiItem && abiItem.type === "function") {
 		const res = AbiFunction.decodeData(abiItem, data) ?? [];
 		return Array.isArray(res) ? res : [res];
 	}
-	// decode event is different
-	// if ("type" in abiItem && abiItem.type === "event") {
-	//     return AbiEvent.(abiItem, data)
-	// }
+	if ("type" in abiItem && abiItem.type === "event") {
+		if (typeof data === "string")
+			throw new Error("Event decoding requires topics and data object");
+		return AbiEvent.decode(abiItem, data);
+	}
 	if ("type" in abiItem && abiItem.type === "error") {
 		const res = AbiError.decode(abiItem, data) ?? [];
 		return Array.isArray(res) ? res : [res];
@@ -143,9 +147,9 @@ export function encode(
 	if ("type" in abiItem && abiItem.type === "function") {
 		return AbiFunction.encodeData(abiItem, args);
 	}
-	// if ("type" in abiItem && abiItem.type==="event"){
-	//     return AbiEvent.encode(abiItem,args)
-	// }
+	if ("type" in abiItem && abiItem.type === "event") {
+		return AbiEvent.encode(abiItem, args as any);
+	}
 	if ("type" in abiItem && abiItem.type === "error") {
 		return AbiError.encode(abiItem, args);
 	}
