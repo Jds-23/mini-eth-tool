@@ -9,8 +9,14 @@ import { z } from "zod";
 import { Button } from "./ui/button";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "./ui/form";
 import { Input } from "./ui/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "./ui/select";
 import { Textarea } from "./ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 const funcSigSchema = z.string().min(1, "Required");
 
@@ -181,12 +187,10 @@ export default function Encoder() {
 			</Form>
 			{sigError && <div className="text-red-500 text-sm">{sigError}</div>}
 			{abiItems && abiItems.length > 1 && (
-				<Select
-					onValueChange={(value) => setSelectedIndex(Number(value))}
-				>
+				<Select onValueChange={(value) => setSelectedIndex(Number(value))}>
 					<SelectTrigger className="w-[280px]">
-        <SelectValue placeholder="Select a signature" />
-      </SelectTrigger>	
+						<SelectValue placeholder="Select a signature" />
+					</SelectTrigger>
 					<SelectContent>
 						{abiItems.map((item, idx) => (
 							<SelectItem key={idx} value={idx.toString()}>
