@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "./ui/button";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "./ui/form";
@@ -12,6 +13,9 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "./ui/select";
+
+const MAX_SAFE_INTEGER_FOR_BITWISE = 2147483647; // 2^31 - 1
+// const MIN_SAFE_INTEGER_FOR_BITWISE = -2147483648; // -2^31
 
 type OperandBase = "dec" | "hex" | "bin";
 
@@ -62,32 +66,33 @@ const Calculator = () => {
 	const [operandBase, setOperandBase] = useState<OperandBase>("dec");
 
 	// Dynamic schema based on operandBase
-	const formSchema = useMemo(() =>
-		z.object({
-			binary: z
-				.string()
-				.regex(baseRegex.bin, { message: "Binary must be 0 or 1 only" })
-				.optional()
-				.or(z.literal("")),
-			decimal: z
-				.string()
-				.regex(baseRegex.dec, { message: "Decimal must be digits only" })
-				.optional()
-				.or(z.literal("")),
-			hex: z
-				.string()
-				.regex(baseRegex.hex, { message: "Hex must be 0-9 or A-F" })
-				.optional()
-				.or(z.literal("")),
-			operand: z
-				.string()
-				.refine((val) => baseRegex[operandBase].test(val), {
-					message: `Invalid operand for selected base (${operandBase})`,
-				})
-				.optional()
-				.or(z.literal("")),
-		}),
-		[operandBase]
+	const formSchema = useMemo(
+		() =>
+			z.object({
+				binary: z
+					.string()
+					.regex(baseRegex.bin, { message: "Binary must be 0 or 1 only" })
+					.optional()
+					.or(z.literal("")),
+				decimal: z
+					.string()
+					.regex(baseRegex.dec, { message: "Decimal must be digits only" })
+					.optional()
+					.or(z.literal("")),
+				hex: z
+					.string()
+					.regex(baseRegex.hex, { message: "Hex must be 0-9 or A-F" })
+					.optional()
+					.or(z.literal("")),
+				operand: z
+					.string()
+					.refine((val) => baseRegex[operandBase].test(val), {
+						message: `Invalid operand for selected base (${operandBase})`,
+					})
+					.optional()
+					.or(z.literal("")),
+			}),
+		[operandBase],
 	);
 
 	const form = useForm<FormValues>({
@@ -107,10 +112,10 @@ const Calculator = () => {
 	const hex = watch("hex") ?? "";
 	const operand = watch("operand") ?? "";
 
-	// When operandBase changes, re-validate operand
-	useEffect(() => {
+	const handleSetOperandBase = (val: OperandBase) => {
+		setOperandBase(val);
 		trigger("operand");
-	}, [operandBase, trigger]);
+	};
 
 	const [operation, setOperation] = useState<Op>("add");
 
@@ -166,6 +171,7 @@ const Calculator = () => {
 
 	const handleOperate = () => {
 		const dec = Number.parseInt(decimal || "0", 10);
+
 		let opVal = 0;
 		if (operation !== "not") {
 			switch (operandBase) {
@@ -182,6 +188,13 @@ const Calculator = () => {
 		if (Number.isNaN(dec) || (operation !== "not" && Number.isNaN(opVal))) {
 			// Let zod/react-hook-form show the error
 			trigger("operand");
+			return;
+		}
+		if (
+			Math.abs(dec) > MAX_SAFE_INTEGER_FOR_BITWISE ||
+			(operation !== "not" && Math.abs(opVal) > MAX_SAFE_INTEGER_FOR_BITWISE)
+		) {
+			// Handle overflow case
 			return;
 		}
 		let result = dec;
@@ -211,11 +224,13 @@ const Calculator = () => {
 				result = dec * opVal;
 				break;
 			case "div":
-				if (opVal === 0) return;
+				if (opVal === 0) {
+					toast.error("Division by zero");
+					return;
+				}
 				result = Math.trunc(dec / opVal);
 				break;
 			case "mod":
-				if (opVal === 0) return;
 				result = dec % opVal;
 				break;
 			case "not":
@@ -403,11 +418,14 @@ const Calculator = () => {
 												);
 												field.onChange(clean);
 											}}
+											disabled={operation === "not"}
 										/>
 									</FormControl>
 									<Select
 										value={operandBase}
-										onValueChange={(val) => setOperandBase(val as OperandBase)}
+										onValueChange={(val) =>
+											handleSetOperandBase(val as OperandBase)
+										}
 									>
 										<SelectTrigger className="w-[80px]">
 											<SelectValue placeholder="dec" />
