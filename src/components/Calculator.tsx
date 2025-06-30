@@ -26,17 +26,17 @@ const baseRegex: Record<OperandBase, RegExp> = {
 const formSchema = z.object({
 	binary: z
 		.string()
-		.regex(/^[01]*$/, { message: "Binary must be 0 or 1 only" })
+		.regex(baseRegex.bin, { message: "Binary must be 0 or 1 only" })
 		.optional()
 		.or(z.literal("")),
 	decimal: z
 		.string()
-		.regex(/^\d*$/, { message: "Decimal must be digits only" })
+		.regex(baseRegex.dec, { message: "Decimal must be digits only" })
 		.optional()
 		.or(z.literal("")),
 	hex: z
 		.string()
-		.regex(/^[0-9a-fA-F]*$/, { message: "Hex must be 0-9 or A-F" })
+		.regex(baseRegex.hex, { message: "Hex must be 0-9 or A-F" })
 		.optional()
 		.or(z.literal("")),
 	operand: z
@@ -50,6 +50,35 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+type Op =
+	| "shiftLeft"
+	| "shiftRight"
+	| "add"
+	| "sub"
+	| "or"
+	| "xor"
+	| "and"
+	| "mult"
+	| "div"
+	| "mod"
+	| "not";
+
+const operationsMap: Record<
+	Op,
+	{ name: string; fn: (a: number, b: number) => number; unary?: boolean }
+> = {
+	shiftLeft: { name: "Shift Left", fn: (a, b) => a << b },
+	shiftRight: { name: "Shift Right", fn: (a, b) => a >> b },
+	add: { name: "Add", fn: (a, b) => a + b },
+	sub: { name: "Sub", fn: (a, b) => a - b },
+	or: { name: "OR", fn: (a, b) => a | b },
+	xor: { name: "XOR", fn: (a, b) => a ^ b },
+	and: { name: "AND", fn: (a, b) => a & b },
+	mult: { name: "Mult", fn: (a, b) => a * b },
+	div: { name: "Div", fn: (a, b) => a / b },
+	mod: { name: "Modulo", fn: (a, b) => a % b },
+	not: { name: "NOT", fn: (a) => ~a, unary: true },
+};
 const Calculator = () => {
 	const form = useForm<FormValues>({
 		resolver: zodResolver(formSchema),
@@ -75,18 +104,6 @@ const Calculator = () => {
 		void form.trigger("operand");
 	}, [operandBase, form]);
 
-	type Op =
-		| "shiftLeft"
-		| "shiftRight"
-		| "add"
-		| "sub"
-		| "or"
-		| "xor"
-		| "and"
-		| "mult"
-		| "div"
-		| "mod"
-		| "not";
 	const [operation, setOperation] = useState<Op>("add");
 
 	// Track which field was last changed
@@ -355,9 +372,10 @@ const Calculator = () => {
 						control={form.control}
 						name="operand"
 						rules={{
-							validate: (val: string) =>
-								baseRegex[operandBase].test(val) ||
-								`Invalid ${operandBase} value`,
+							validate: (val: string | undefined) =>
+								val && baseRegex[operandBase].test(val)
+									? true
+									: `Invalid ${operandBase} value`,
 						}}
 						render={({ field }) => (
 							<FormItem>
@@ -403,17 +421,11 @@ const Calculator = () => {
 								<SelectValue placeholder="Operation" />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="add">Add</SelectItem>
-								<SelectItem value="sub">Sub</SelectItem>
-								<SelectItem value="mult">Mult</SelectItem>
-								<SelectItem value="div">Div</SelectItem>
-								<SelectItem value="mod">Modulo</SelectItem>
-								<SelectItem value="or">OR</SelectItem>
-								<SelectItem value="and">AND</SelectItem>
-								<SelectItem value="xor">XOR</SelectItem>
-								<SelectItem value="not">NOT</SelectItem>
-								<SelectItem value="shiftLeft">Shift Left</SelectItem>
-								<SelectItem value="shiftRight">Shift Right</SelectItem>
+								{Object.entries(operationsMap).map(([key, value]) => (
+									<SelectItem key={key} value={key}>
+										{value.name}
+									</SelectItem>
+								))}
 							</SelectContent>
 						</Select>
 						<Button type="button" onClick={handleOperate}>
