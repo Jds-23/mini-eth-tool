@@ -55,7 +55,18 @@ const Calculator = () => {
 	type OperandBase = "dec" | "hex" | "bin";
 	const [operandBase, setOperandBase] = useState<OperandBase>("dec");
 
-	type Op = "shiftLeft" | "shiftRight" | "add" | "sub" | "or" | "xor";
+	type Op =
+		| "shiftLeft"
+		| "shiftRight"
+		| "add"
+		| "sub"
+		| "or"
+		| "xor"
+		| "and"
+		| "mult"
+		| "div"
+		| "mod"
+		| "not";
 	const [operation, setOperation] = useState<Op>("add");
 
 	// Track which field was last changed
@@ -111,17 +122,20 @@ const Calculator = () => {
 	const handleOperate = () => {
 		const dec = Number.parseInt(decimal || "0", 10);
 		let opVal = 0;
-		switch (operandBase) {
-			case "hex":
-				opVal = Number.parseInt(operand || "0", 16);
-				break;
-			case "bin":
-				opVal = Number.parseInt(operand || "0", 2);
-				break;
-			default:
-				opVal = Number.parseInt(operand || "0", 10);
+		if (operation !== "not") {
+			switch (operandBase) {
+				case "hex":
+					opVal = Number.parseInt(operand || "0", 16);
+					break;
+				case "bin":
+					opVal = Number.parseInt(operand || "0", 2);
+					break;
+				default:
+					opVal = Number.parseInt(operand || "0", 10);
+			}
+			if (Number.isNaN(opVal)) return;
 		}
-		if (Number.isNaN(dec) || Number.isNaN(opVal)) return;
+		if (Number.isNaN(dec)) return;
 		let result = dec;
 		switch (operation) {
 			case "shiftLeft":
@@ -141,6 +155,23 @@ const Calculator = () => {
 				break;
 			case "xor":
 				result = dec ^ opVal;
+				break;
+			case "and":
+				result = dec & opVal;
+				break;
+			case "mult":
+				result = dec * opVal;
+				break;
+			case "div":
+				if (opVal === 0) return;
+				result = Math.trunc(dec / opVal);
+				break;
+			case "mod":
+				if (opVal === 0) return;
+				result = dec % opVal;
+				break;
+			case "not":
+				result = ~dec;
 				break;
 		}
 		setValue("decimal", result.toString(10));
@@ -328,8 +359,13 @@ const Calculator = () => {
 							<SelectContent>
 								<SelectItem value="add">Add</SelectItem>
 								<SelectItem value="sub">Sub</SelectItem>
+								<SelectItem value="mult">Mult</SelectItem>
+								<SelectItem value="div">Div</SelectItem>
+								<SelectItem value="mod">Modulo</SelectItem>
 								<SelectItem value="or">OR</SelectItem>
+								<SelectItem value="and">AND</SelectItem>
 								<SelectItem value="xor">XOR</SelectItem>
+								<SelectItem value="not">NOT</SelectItem>
 								<SelectItem value="shiftLeft">Shift Left</SelectItem>
 								<SelectItem value="shiftRight">Shift Right</SelectItem>
 							</SelectContent>
