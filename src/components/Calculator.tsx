@@ -1,10 +1,17 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "./ui/button";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "./ui/form";
 import { Input } from "./ui/input";
+import {
+       Select,
+       SelectContent,
+       SelectItem,
+       SelectTrigger,
+       SelectValue,
+} from "./ui/select";
 
 const formSchema = z.object({
 	binary: z
@@ -17,11 +24,16 @@ const formSchema = z.object({
 		.regex(/^\d*$/, { message: "Decimal must be digits only" })
 		.optional()
 		.or(z.literal("")),
-	hex: z
-		.string()
-		.regex(/^[0-9a-fA-F]*$/, { message: "Hex must be 0-9 or A-F" })
-		.optional()
-		.or(z.literal("")),
+       hex: z
+               .string()
+               .regex(/^[0-9a-fA-F]*$/, { message: "Hex must be 0-9 or A-F" })
+               .optional()
+               .or(z.literal("")),
+       operand: z
+               .string()
+               .regex(/^\d*$/, { message: "Operand must be digits only" })
+               .optional()
+               .or(z.literal("")),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -29,18 +41,29 @@ type FormValues = z.infer<typeof formSchema>;
 const Calculator = () => {
 	const form = useForm<FormValues>({
 		resolver: zodResolver(formSchema),
-		defaultValues: {
-			binary: "",
-			decimal: "",
-			hex: "",
-		},
+               defaultValues: {
+                       binary: "",
+                       decimal: "",
+                       hex: "",
+                       operand: "",
+               },
 		mode: "onChange",
 	});
 
-	const { watch, setValue, reset } = form;
-	const binary = watch("binary") ?? "";
-	const decimal = watch("decimal") ?? "";
-	const hex = watch("hex") ?? "";
+       const { watch, setValue, reset } = form;
+       const binary = watch("binary") ?? "";
+       const decimal = watch("decimal") ?? "";
+       const hex = watch("hex") ?? "";
+       const operand = watch("operand") ?? "";
+
+       type Op =
+               | "shiftLeft"
+               | "shiftRight"
+               | "add"
+               | "sub"
+               | "or"
+               | "xor";
+       const [operation, setOperation] = useState<Op>("add");
 
 	// Track which field was last changed
 	const lastChanged = useRef<"binary" | "decimal" | "hex" | null>(null);
@@ -87,10 +110,39 @@ const Calculator = () => {
 		}
 	}, [binary, decimal, hex, setValue]);
 
-	const handleClear = () => {
-		reset();
-		lastChanged.current = null;
-	};
+       const handleClear = () => {
+               reset();
+               lastChanged.current = null;
+       };
+
+       const handleOperate = () => {
+               const dec = Number.parseInt(decimal || "0", 10);
+               const opVal = Number.parseInt(operand || "0", 10);
+               if (Number.isNaN(dec) || Number.isNaN(opVal)) return;
+               let result = dec;
+               switch (operation) {
+                       case "shiftLeft":
+                               result = dec << opVal;
+                               break;
+                       case "shiftRight":
+                               result = dec >> opVal;
+                               break;
+                       case "add":
+                               result = dec + opVal;
+                               break;
+                       case "sub":
+                               result = dec - opVal;
+                               break;
+                       case "or":
+                               result = dec | opVal;
+                               break;
+                       case "xor":
+                               result = dec ^ opVal;
+                               break;
+               }
+               setValue("decimal", result.toString(10));
+               lastChanged.current = "decimal";
+       };
 
 	// Helper functions for formatting
 	function formatDecimal(val: string) {
@@ -195,10 +247,10 @@ const Calculator = () => {
 							);
 						}}
 					/>
-					<FormField
-						control={form.control}
-						name="hex"
-						render={({ field }) => {
+                                       <FormField
+                                               control={form.control}
+                                               name="hex"
+                                               render={({ field }) => {
 							const displayValue = formatHex((field.value ?? "").toUpperCase());
 							return (
 								<FormItem>
@@ -228,12 +280,49 @@ const Calculator = () => {
 									</FormControl>
 									<FormMessage />
 								</FormItem>
-							);
-						}}
-					/>
-					<Button type="button" variant="outline" onClick={handleClear}>
-						Clear
-					</Button>
+                                                       );
+                                               }}
+                                       />
+                                       <FormField
+                                               control={form.control}
+                                               name="operand"
+                                               render={({ field }) => (
+                                                       <FormItem>
+                                                               <FormControl>
+                                                                       <Input
+                                                                               {...field}
+                                                                               placeholder="Operand"
+                                                                               autoComplete="off"
+                                                                       />
+                                                               </FormControl>
+                                                               <FormMessage />
+                                                       </FormItem>
+                                               )}
+                                       />
+                                       <div className="flex gap-2">
+                                               <Select
+                                                       value={operation}
+                                                       onValueChange={(val) => setOperation(val as Op)}
+                                               >
+                                                       <SelectTrigger className="w-[140px]">
+                                                               <SelectValue placeholder="Operation" />
+                                                       </SelectTrigger>
+                                                       <SelectContent>
+                                                               <SelectItem value="add">Add</SelectItem>
+                                                               <SelectItem value="sub">Sub</SelectItem>
+                                                               <SelectItem value="or">OR</SelectItem>
+                                                               <SelectItem value="xor">XOR</SelectItem>
+                                                               <SelectItem value="shiftLeft">Shift Left</SelectItem>
+                                                               <SelectItem value="shiftRight">Shift Right</SelectItem>
+                                                       </SelectContent>
+                                               </Select>
+                                               <Button type="button" onClick={handleOperate}>
+                                                       Execute
+                                               </Button>
+                                               <Button type="button" variant="outline" onClick={handleClear}>
+                                                       Clear
+                                               </Button>
+                                       </div>
 				</form>
 			</Form>
 		</div>
