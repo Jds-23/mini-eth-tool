@@ -31,6 +31,7 @@ export default function Encoder() {
 	const [sigError, setSigError] = useState<string | null>(null);
 
 	const [encoded, setEncoded] = useState<string | null>(null);
+	const [eventTopics, setEventTopics] = useState<string[] | null>(null);
 	const [usePacked, setUsePacked] = useState(false);
 	const [copied, setCopied] = useState(false);
 	const copyTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -41,6 +42,7 @@ export default function Encoder() {
 	useEffect(() => {
 		setSigError(null);
 		setEncoded(null);
+		setEventTopics(null);
 		setSelectedIndex(0);
 		try {
 			const parsed = JSON.parse(sig);
@@ -115,8 +117,14 @@ export default function Encoder() {
 		try {
 			const args = paramFields.map((f) => data[f.name]);
 			// @ts-expect-error
-			const hex = fullAbi.encode(abiObj, args, { packed: usePacked });
-			setEncoded(hex);
+			const res = fullAbi.encode(abiObj, args, { packed: usePacked });
+			if (abiObj.type === "event" && res && typeof res === "object") {
+				setEventTopics(res.topics as string[]);
+				setEncoded(null);
+			} else {
+				setEncoded(res as string);
+				setEventTopics(null);
+			}
 		} catch (e) {
 			setEncoded("");
 			setSigError(e instanceof Error ? e.message : "Encoding error");
@@ -239,7 +247,8 @@ export default function Encoder() {
 						)}
 						{(abiObj.type === "function" ||
 							abiObj.type === "error" ||
-							abiObj.type === "tuple") && (
+							abiObj.type === "tuple" ||
+							abiObj.type === "event") && (
 							<Button type="submit" className="w-fit">
 								Encode
 							</Button>
@@ -280,6 +289,36 @@ export default function Encoder() {
 						</div>
 					</div>
 				)}
+			{eventTopics && abiObj?.type === "event" && (
+				<div className="flex flex-col gap-2">
+					{eventTopics.map((topic, idx) => (
+						<div className="flex items-center gap-2" key={idx}>
+							<Input type="text" readOnly value={topic} className="flex-1" />
+							<Button
+								type="button"
+								size="icon"
+								variant="ghost"
+								aria-label={copied ? "Copied!" : "Copy to clipboard"}
+								onClick={() => {
+									navigator.clipboard.writeText(topic);
+									setCopied(true);
+									if (copyTimeout.current) clearTimeout(copyTimeout.current);
+									copyTimeout.current = setTimeout(
+										() => setCopied(false),
+										1000,
+									);
+								}}
+							>
+								{copied ? (
+									<Check className="w-4 h-4" />
+								) : (
+									<Copy className="w-4 h-4" />
+								)}
+							</Button>
+						</div>
+					))}
+				</div>
+			)}
 			{/* {abiObj?.type === "event" && (
 				<div className="flex flex-col gap-2">
 					<div className="text-xs text-muted-foreground">

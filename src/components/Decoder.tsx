@@ -13,15 +13,19 @@ import { Textarea } from "./ui/textarea";
 
 const sigSchema = z.string().min(1, "Required");
 const hexSchema = z.string().min(1, "Required");
+const topicsSchema = z.string().optional();
 
 export default function Decoder() {
 	const sigForm = useForm({
-		resolver: zodResolver(z.object({ sig: sigSchema, hex: hexSchema })),
-		defaultValues: { sig: "", hex: "" },
+		resolver: zodResolver(
+			z.object({ sig: sigSchema, hex: hexSchema, topics: topicsSchema }),
+		),
+		defaultValues: { sig: "", hex: "", topics: "" },
 		mode: "onChange",
 	});
 	const sig = useWatch({ control: sigForm.control, name: "sig" });
 	const hex = useWatch({ control: sigForm.control, name: "hex" });
+	const topicsInput = useWatch({ control: sigForm.control, name: "topics" });
 	const [sigError, setSigError] = useState<string | null>(null);
 	const [decodeError, setDecodeError] = useState<string | null>(null);
 	const [decoded, setDecoded] = useState<unknown[] | null>(null);
@@ -131,7 +135,24 @@ export default function Decoder() {
 		const hexTyped = hexVal as `0x${string}`;
 		try {
 			// @ts-expect-error
-			const values: unknown[] = fullAbi.decode(abiObj, hexTyped);
+			const values: unknown[] =
+				abiObj.type === "event"
+					? (() => {
+							const extras = (topicsInput || "")
+								.split(/[,\n\s]+/)
+								.map((t) => t.trim())
+								.filter(Boolean);
+							const {
+								// @ts-expect-error
+								topics: [topic0],
+							} = fullAbi.encode(abiObj, []);
+							return fullAbi.decode(abiObj, {
+								data: hexTyped,
+								topics: [topic0, ...extras],
+							});
+						})()
+					: // @ts-expect-error
+						fullAbi.decode(abiObj, hexTyped);
 
 			setDecoded(values);
 		} catch (e: unknown) {
@@ -166,6 +187,24 @@ export default function Decoder() {
 							</FormItem>
 						)}
 					/>
+					{abiObj && abiObj.type === "event" && (
+						<FormField
+							control={sigForm.control}
+							name="topics"
+							render={({ field }) => (
+								<FormItem>
+									<FormControl>
+										<Textarea
+											{...field}
+											placeholder="Event topics, comma or newline separated (without topic0)"
+											className="max-h-24 overflow-auto"
+										/>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+					)}
 					{/* Signature lookup UI */}
 					{!sig && selector.length === 10 && (
 						<>
