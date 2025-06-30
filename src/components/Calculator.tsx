@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "./ui/button";
@@ -14,41 +14,6 @@ import {
 } from "./ui/select";
 
 type OperandBase = "dec" | "hex" | "bin";
-
-let operandBaseForValidation: OperandBase = "dec";
-
-const baseRegex: Record<OperandBase, RegExp> = {
-	dec: /^\d*$/,
-	hex: /^[0-9a-fA-F]*$/,
-	bin: /^[01]*$/,
-};
-
-const formSchema = z.object({
-	binary: z
-		.string()
-		.regex(baseRegex.bin, { message: "Binary must be 0 or 1 only" })
-		.optional()
-		.or(z.literal("")),
-	decimal: z
-		.string()
-		.regex(baseRegex.dec, { message: "Decimal must be digits only" })
-		.optional()
-		.or(z.literal("")),
-	hex: z
-		.string()
-		.regex(baseRegex.hex, { message: "Hex must be 0-9 or A-F" })
-		.optional()
-		.or(z.literal("")),
-	operand: z
-		.string()
-		.refine((val) => baseRegex[operandBaseForValidation].test(val), {
-			message: "Invalid operand for selected base",
-		})
-		.optional()
-		.or(z.literal("")),
-});
-
-type FormValues = z.infer<typeof formSchema>;
 
 type Op =
 	| "shiftLeft"
@@ -79,7 +44,52 @@ const operationsMap: Record<
 	mod: { name: "Modulo", fn: (a, b) => a % b },
 	not: { name: "NOT", fn: (a) => ~a, unary: true },
 };
+
+const baseRegex: Record<OperandBase, RegExp> = {
+	dec: /^\d*$/,
+	hex: /^[0-9a-fA-F]*$/,
+	bin: /^[01]*$/,
+};
+
+type FormValues = {
+	binary?: string;
+	decimal?: string;
+	hex?: string;
+	operand?: string;
+};
+
 const Calculator = () => {
+	const [operandBase, setOperandBase] = useState<OperandBase>("dec");
+
+	// Dynamic schema based on operandBase
+	const formSchema = useMemo(() =>
+		z.object({
+			binary: z
+				.string()
+				.regex(baseRegex.bin, { message: "Binary must be 0 or 1 only" })
+				.optional()
+				.or(z.literal("")),
+			decimal: z
+				.string()
+				.regex(baseRegex.dec, { message: "Decimal must be digits only" })
+				.optional()
+				.or(z.literal("")),
+			hex: z
+				.string()
+				.regex(baseRegex.hex, { message: "Hex must be 0-9 or A-F" })
+				.optional()
+				.or(z.literal("")),
+			operand: z
+				.string()
+				.refine((val) => baseRegex[operandBase].test(val), {
+					message: `Invalid operand for selected base (${operandBase})`,
+				})
+				.optional()
+				.or(z.literal("")),
+		}),
+		[operandBase]
+	);
+
 	const form = useForm<FormValues>({
 		resolver: zodResolver(formSchema),
 		defaultValues: {
@@ -91,18 +101,16 @@ const Calculator = () => {
 		mode: "onChange",
 	});
 
-	const { watch, setValue, reset } = form;
+	const { watch, setValue, reset, trigger } = form;
 	const binary = watch("binary") ?? "";
 	const decimal = watch("decimal") ?? "";
 	const hex = watch("hex") ?? "";
 	const operand = watch("operand") ?? "";
 
-	const [operandBase, setOperandBase] = useState<OperandBase>("dec");
-
+	// When operandBase changes, re-validate operand
 	useEffect(() => {
-		operandBaseForValidation = operandBase;
-		void form.trigger("operand");
-	}, [operandBase, form]);
+		trigger("operand");
+	}, [operandBase, trigger]);
 
 	const [operation, setOperation] = useState<Op>("add");
 
@@ -170,9 +178,12 @@ const Calculator = () => {
 				default:
 					opVal = Number.parseInt(operand || "0", 10);
 			}
-			if (Number.isNaN(opVal)) return;
 		}
-		if (Number.isNaN(dec)) return;
+		if (Number.isNaN(dec) || (operation !== "not" && Number.isNaN(opVal))) {
+			// Let zod/react-hook-form show the error
+			trigger("operand");
+			return;
+		}
 		let result = dec;
 		switch (operation) {
 			case "shiftLeft":
