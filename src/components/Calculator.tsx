@@ -13,6 +13,16 @@ import {
 	SelectValue,
 } from "./ui/select";
 
+type OperandBase = "dec" | "hex" | "bin";
+
+let operandBaseForValidation: OperandBase = "dec";
+
+const baseRegex: Record<OperandBase, RegExp> = {
+	dec: /^\d*$/,
+	hex: /^[0-9a-fA-F]*$/,
+	bin: /^[01]*$/,
+};
+
 const formSchema = z.object({
 	binary: z
 		.string()
@@ -29,7 +39,13 @@ const formSchema = z.object({
 		.regex(/^[0-9a-fA-F]*$/, { message: "Hex must be 0-9 or A-F" })
 		.optional()
 		.or(z.literal("")),
-	operand: z.string().optional().or(z.literal("")),
+	operand: z
+		.string()
+		.refine((val) => baseRegex[operandBaseForValidation].test(val), {
+			message: "Invalid operand for selected base",
+		})
+		.optional()
+		.or(z.literal("")),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -52,8 +68,12 @@ const Calculator = () => {
 	const hex = watch("hex") ?? "";
 	const operand = watch("operand") ?? "";
 
-	type OperandBase = "dec" | "hex" | "bin";
 	const [operandBase, setOperandBase] = useState<OperandBase>("dec");
+
+	useEffect(() => {
+		operandBaseForValidation = operandBase;
+		void form.trigger("operand");
+	}, [operandBase, form]);
 
 	type Op =
 		| "shiftLeft"
@@ -190,15 +210,29 @@ const Calculator = () => {
 		if (!val) return "";
 		return val.replace(/(.{4})/g, "$1_").replace(/_+$/, "");
 	}
+
 	function unformatBinary(val: string) {
 		return val.replace(/_/g, "");
 	}
+
 	function formatHex(val: string) {
 		if (!val) return "";
 		return val.replace(/(.{2})/g, "$1_").replace(/_+$/, "");
 	}
+
 	function unformatHex(val: string) {
 		return val.replace(/_/g, "");
+	}
+
+	function sanitizeOperand(val: string, base: OperandBase) {
+		switch (base) {
+			case "hex":
+				return val.replace(/[^0-9a-fA-F]/g, "");
+			case "bin":
+				return val.replace(/[^01]/g, "");
+			default:
+				return val.replace(/\D/g, "");
+		}
 	}
 
 	return (
@@ -320,6 +354,11 @@ const Calculator = () => {
 					<FormField
 						control={form.control}
 						name="operand"
+						rules={{
+							validate: (val: string) =>
+								baseRegex[operandBase].test(val) ||
+								`Invalid ${operandBase} value`,
+						}}
 						render={({ field }) => (
 							<FormItem>
 								<div className="flex items-center gap-2">
@@ -328,6 +367,13 @@ const Calculator = () => {
 											{...field}
 											placeholder="Operand"
 											autoComplete="off"
+											onChange={(e) => {
+												const clean = sanitizeOperand(
+													e.target.value,
+													operandBase,
+												);
+												field.onChange(clean);
+											}}
 										/>
 									</FormControl>
 									<Select
