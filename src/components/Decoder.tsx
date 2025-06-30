@@ -142,8 +142,8 @@ export default function Decoder() {
 								.split(/[,\n\s]+/)
 								.map((t) => t.trim())
 								.filter(Boolean);
-							// @ts-expect-error
 							const {
+								// @ts-expect-error
 								topics: [topic0],
 							} = fullAbi.encode(abiObj, []);
 							return fullAbi.decode(abiObj, {
@@ -151,9 +151,10 @@ export default function Decoder() {
 								topics: [topic0, ...extras],
 							});
 						})()
-					: fullAbi.decode(abiObj, hexTyped);
+					: // @ts-expect-error
+						fullAbi.decode(abiObj, hexTyped);
 
-			setDecoded(values as any);
+			setDecoded(values);
 		} catch (e: unknown) {
 			setDecodeError(e instanceof Error ? e.message : "Decoding error");
 		}

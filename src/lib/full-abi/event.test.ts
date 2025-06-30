@@ -1,4 +1,4 @@
-import { AbiEvent, AbiParameters } from "ox";
+import { AbiParameters } from "ox";
 import { expect, test } from "vitest";
 import { fullAbi } from "./index";
 
@@ -10,15 +10,12 @@ test("event", () => {
 	const encoded = fullAbi.encode(abiItem, [
 		"0x0000000000000000000000000000000000000001",
 		"0x0000000000000000000000000000000000000002",
-	]) as { topics: string[] };
-	const data = AbiParameters.encode(
-		[{ name: "value", type: "uint256" }],
-		["1"],
-	);
+	]) as { topics: readonly `0x${string}`[] };
+	const data = AbiParameters.encode([{ name: "value", type: "uint256" }], [1n]);
 	const decoded = fullAbi.decode(abiItem, {
 		data,
 		topics: encoded.topics,
-	}) as any;
+	}) as { from: string; to: string; value: bigint };
 	expect(abiItem.type).toBe("event");
 	expect(params.length).toBe(3);
 	expect(encoded.topics.length).toBe(3);

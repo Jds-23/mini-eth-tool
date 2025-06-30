@@ -112,6 +112,9 @@ export function decode(
 	data: Hex.Hex | { data?: Hex.Hex; topics: readonly Hex.Hex[] },
 ) {
 	if ("type" in abiItem && abiItem.type === "function") {
+		if (typeof data !== "string") {
+			throw new Error("Function decoding requires topics and data object");
+		}
 		const res = AbiFunction.decodeData(abiItem, data) ?? [];
 		return Array.isArray(res) ? res : [res];
 	}
@@ -121,6 +124,9 @@ export function decode(
 		return AbiEvent.decode(abiItem, data);
 	}
 	if ("type" in abiItem && abiItem.type === "error") {
+		if (typeof data !== "string") {
+			throw new Error("Error decoding requires topics and data object");
+		}
 		const res = AbiError.decode(abiItem, data) ?? [];
 		return Array.isArray(res) ? res : [res];
 	}
@@ -133,6 +139,9 @@ export function decode(
 		//     const res = AbiParameters.d(abiItem.components, data) ?? [];
 		//     return Array.isArray(res) ? res : [res];
 		// }
+		if (typeof data !== "string") {
+			throw new Error("Struct decoding requires topics and data object");
+		}
 		const res = AbiParameters.decode(abiItem.components, data) ?? [];
 		return Array.isArray(res) ? res : [res];
 	}
@@ -148,7 +157,7 @@ export function encode(
 		return AbiFunction.encodeData(abiItem, args);
 	}
 	if ("type" in abiItem && abiItem.type === "event") {
-		return AbiEvent.encode(abiItem, args as any);
+		return AbiEvent.encode(abiItem, args);
 	}
 	if ("type" in abiItem && abiItem.type === "error") {
 		return AbiError.encode(abiItem, args);
