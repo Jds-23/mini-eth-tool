@@ -130,10 +130,19 @@ export function decode(
 		const res = AbiError.decode(abiItem, data) ?? [];
 		return Array.isArray(res) ? res : [res];
 	}
-	// if ("type" in abiItem && abiItem.type === "constructor") {
-	//     const res = AbiConstructor.decode(abiItem, data) ?? [];
-	//     return Array.isArray(res) ? res : [res];
-	// }
+        if ("type" in abiItem && abiItem.type === "constructor") {
+                if (typeof data === "string" || !("bytecode" in data)) {
+                        throw new Error(
+                                "Constructor decoding requires { bytecode, data } object",
+                        );
+                }
+                const res =
+                        AbiConstructor.decode(abiItem, {
+                                bytecode: (data as { bytecode: Hex.Hex }).bytecode,
+                                data: (data as { data: Hex.Hex }).data ?? "0x",
+                        }) ?? [];
+                return Array.isArray(res) ? res : [res];
+        }
 	if ("components" in abiItem && abiItem.components.length > 0) {
 		// if (options.packed) {
 		//     const res = AbiParameters.d(abiItem.components, data) ?? [];
