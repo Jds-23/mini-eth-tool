@@ -109,7 +109,10 @@ export function getParameter(abiItem: from.ReturnType) {
 
 export function decode(
 	abiItem: from.ReturnType,
-	data: Hex.Hex | { data?: Hex.Hex; topics: readonly Hex.Hex[] },
+	data:
+		| Hex.Hex
+		| { data?: Hex.Hex; topics: readonly Hex.Hex[] }
+		| { bytecode: Hex.Hex; data: Hex.Hex },
 ) {
 	if ("type" in abiItem && abiItem.type === "function") {
 		if (typeof data !== "string") {
@@ -119,7 +122,7 @@ export function decode(
 		return Array.isArray(res) ? res : [res];
 	}
 	if ("type" in abiItem && abiItem.type === "event") {
-		if (typeof data === "string")
+		if (typeof data === "string" || !("topics" in data))
 			throw new Error("Event decoding requires topics and data object");
 		return AbiEvent.decode(abiItem, data);
 	}
@@ -130,19 +133,19 @@ export function decode(
 		const res = AbiError.decode(abiItem, data) ?? [];
 		return Array.isArray(res) ? res : [res];
 	}
-        if ("type" in abiItem && abiItem.type === "constructor") {
-                if (typeof data === "string" || !("bytecode" in data)) {
-                        throw new Error(
-                                "Constructor decoding requires { bytecode, data } object",
-                        );
-                }
-                const res =
-                        AbiConstructor.decode(abiItem, {
-                                bytecode: (data as { bytecode: Hex.Hex }).bytecode,
-                                data: (data as { data: Hex.Hex }).data ?? "0x",
-                        }) ?? [];
-                return Array.isArray(res) ? res : [res];
-        }
+	if ("type" in abiItem && abiItem.type === "constructor") {
+		if (typeof data === "string" || !("bytecode" in data)) {
+			throw new Error(
+				"Constructor decoding requires { bytecode, data } object",
+			);
+		}
+		const res =
+			AbiConstructor.decode(abiItem, {
+				bytecode: (data as { bytecode: Hex.Hex }).bytecode,
+				data: (data as { data: Hex.Hex }).data ?? "0x",
+			}) ?? [];
+		return Array.isArray(res) ? res : [res];
+	}
 	if ("components" in abiItem && abiItem.components.length > 0) {
 		// if (options.packed) {
 		//     const res = AbiParameters.d(abiItem.components, data) ?? [];
