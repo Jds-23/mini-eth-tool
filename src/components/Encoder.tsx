@@ -38,27 +38,30 @@ export default function Encoder() {
 	const [abiItems, setAbiItems] = useState<AbiItem.AbiItem[] | null>(null);
 	const [selectedIndex, setSelectedIndex] = useState(0);
 
-	// Parse signature or ABI JSON whenever input changes
-	useEffect(() => {
-		setSigError(null);
-		setEncoded(null);
-		setEventTopics(null);
-		setSelectedIndex(0);
-		try {
-			const parsed = JSON.parse(sig);
-			if (Array.isArray(parsed)) {
-				setAbiItems(parsed as AbiItem.AbiItem[]);
-				return;
-			}
-			if (typeof parsed === "object" && parsed !== null) {
-				setAbiItems([parsed as AbiItem.AbiItem]);
-				return;
-			}
-		} catch {
-			// ignore JSON parse errors
-		}
-		setAbiItems(null);
-	}, [sig]);
+        // Parse signature or ABI JSON whenever input changes (debounced)
+        useEffect(() => {
+                const handle = setTimeout(() => {
+                        setSigError(null);
+                        setEncoded(null);
+                        setEventTopics(null);
+                        setSelectedIndex(0);
+                        try {
+                                const parsed = JSON.parse(sig);
+                                if (Array.isArray(parsed)) {
+                                        setAbiItems(parsed as AbiItem.AbiItem[]);
+                                        return;
+                                }
+                                if (typeof parsed === "object" && parsed !== null) {
+                                        setAbiItems([parsed as AbiItem.AbiItem]);
+                                        return;
+                                }
+                        } catch {
+                                // ignore JSON parse errors
+                        }
+                        setAbiItems(null);
+                }, 300);
+                return () => clearTimeout(handle);
+        }, [sig]);
 
 	// Derive ABI item from signature or ABI JSON
 	const abiObj = useMemo<
@@ -194,20 +197,23 @@ export default function Encoder() {
 				</form>
 			</Form>
 			{sigError && <div className="text-red-500 text-sm">{sigError}</div>}
-			{abiItems && abiItems.length > 1 && (
-				<Select onValueChange={(value) => setSelectedIndex(Number(value))}>
-					<SelectTrigger className="w-[280px]">
-						<SelectValue placeholder="Select a signature" />
-					</SelectTrigger>
-					<SelectContent>
-						{abiItems.map((item, idx) => (
-							<SelectItem key={idx} value={idx.toString()}>
-								{"type" in item ? item.type : "item"}
-								{"name" in item && item.name ? ` ${item.name}` : ""}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
+                        {abiItems && abiItems.length > 1 && (
+                                <Select
+                                        value={selectedIndex.toString()}
+                                        onValueChange={(value) => setSelectedIndex(Number(value))}
+                                >
+                                        <SelectTrigger className="w-[280px]">
+                                                <SelectValue placeholder="Select a signature" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                                {abiItems.map((item, idx) => (
+                                                        <SelectItem key={idx} value={idx.toString()}>
+                                                                {"type" in item ? item.type : "item"}
+                                                                {"name" in item && item.name ? ` ${item.name}` : " (anonymous)"}
+                                                        </SelectItem>
+                                                ))}
+                                        </SelectContent>
+                                </Select>
 			)}
 			{abiObj && (
 				<Form {...paramForm}>

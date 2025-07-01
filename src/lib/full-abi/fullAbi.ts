@@ -58,22 +58,63 @@ export declare namespace from {
 }
 
 export function fromAbi(
-	abi: readonly AbiItem.AbiItem[] | Record<string, unknown>,
-	identifier?: string,
+        abi: readonly AbiItem.AbiItem[] | Record<string, unknown>,
+        identifier?: string,
 ): from.ReturnType | null {
-	const items = Array.isArray(abi) ? abi : [abi as AbiItem.AbiItem];
-	if (!items.length) return null;
+        const items = Array.isArray(abi) ? abi : [abi as AbiItem.AbiItem];
+        if (!items.length) return null;
 
-	if (identifier) {
-		try {
-			return AbiFunction.fromAbi(
-				items as readonly AbiFunction.AbiFunction[],
-				identifier as Hex.Hex,
-			) as from.ReturnType;
-		} catch {
-			return null;
-		}
-	}
+        if (identifier) {
+                const isSelector = /^0x[a-fA-F0-9]{8}$/.test(identifier);
+                const isTopic = /^0x[a-fA-F0-9]{64}$/.test(identifier);
+
+                try {
+                        if (isTopic)
+                                return AbiEvent.fromAbi(
+                                        items as readonly AbiEvent.AbiEvent[],
+                                        identifier as Hex.Hex,
+                                ) as from.ReturnType;
+                        if (isSelector) {
+                                try {
+                                        return AbiFunction.fromAbi(
+                                                items as readonly AbiFunction.AbiFunction[],
+                                                identifier as Hex.Hex,
+                                        ) as from.ReturnType;
+                                } catch {}
+                                return AbiError.fromAbi(
+                                        items as readonly AbiError.AbiError[],
+                                        identifier as Hex.Hex,
+                                ) as from.ReturnType;
+                        }
+
+                        return (
+                                AbiFunction.fromAbi(
+                                        items as readonly AbiFunction.AbiFunction[],
+                                        identifier as Hex.Hex,
+                                ) as from.ReturnType
+                        );
+                } catch {
+                        try {
+                                return AbiEvent.fromAbi(
+                                        items as readonly AbiEvent.AbiEvent[],
+                                        identifier as Hex.Hex,
+                                ) as from.ReturnType;
+                        } catch {}
+                        try {
+                                return AbiError.fromAbi(
+                                        items as readonly AbiError.AbiError[],
+                                        identifier as Hex.Hex,
+                                ) as from.ReturnType;
+                        } catch {}
+                        try {
+                                return AbiConstructor.fromAbi(
+                                        items as readonly AbiConstructor.AbiConstructor[],
+                                        identifier as Hex.Hex,
+                                ) as from.ReturnType;
+                        } catch {}
+                        return null;
+                }
+        }
 
 	const first = items.find(
 		(i) =>
