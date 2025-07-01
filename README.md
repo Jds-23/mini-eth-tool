@@ -19,7 +19,8 @@ pnpm build
 
 ## Testing
 
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
+This project uses [Vitest](https://vitest.dev/) for testing. Configuration lives in `vitest.config.ts` and the test TypeScript settings are in `tsconfig.vitest.json`.
+Run the tests with:
 
 ```bash
 pnpm test

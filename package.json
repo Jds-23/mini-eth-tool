@@ -7,7 +7,7 @@
     "start": "node .output/server/index.mjs",
     "build": "vite build",
     "serve": "vite preview",
-    "test": "vitest run",
+    "test": "pnpm exec vitest run",
     "format": "biome format",
     "lint": "biome lint",
     "check": "biome check",
