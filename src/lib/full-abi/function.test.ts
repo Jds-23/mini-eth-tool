@@ -1,4 +1,4 @@
-import { AbiFunction } from "ox";
+import { AbiFunction, type Hex } from "ox";
 import { expect, test } from "vitest";
 import { fullAbi } from "./index";
 
@@ -17,6 +17,13 @@ test("function", () => {
 		AbiFunction.encodeData(abiItem as AbiFunction.AbiFunction, ["1", "2"]),
 	);
 	expect(decoded).toEqual([1n, 2n]);
+});
+
+test("throws on invalid decode type", () => {
+	const abiItem = fullAbi.from("function foo(uint256 a)");
+	expect(() =>
+		fullAbi.decode(abiItem, { data: "0x", topics: [] } as unknown as Hex.Hex),
+	).toThrow("Function decoding requires topics and data object");
 });
 
 // test('error', () => {
