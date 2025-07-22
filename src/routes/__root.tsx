@@ -39,11 +39,13 @@ export const Route = createRootRoute({
 	component: () => (
 		<QueryClientProvider client={queryClient}>
 			<RootDocument>
-				<Header />
+				<div className="bg-black min-h-screen">
+					<Header />
 
-				<Toaster />
-				<Outlet />
-				<TanStackRouterDevtools />
+					<Toaster />
+					<Outlet />
+					<TanStackRouterDevtools />
+				</div>
 			</RootDocument>
 		</QueryClientProvider>
 	),

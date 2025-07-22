@@ -160,8 +160,8 @@ export default function Decoder() {
 	}
 
 	return (
-		<div className="bg-gray-50 p-6 rounded-lg border-2 border-dashed max-w-lg border-black shadow flex flex-col gap-6">
-			<h2 className="text-lg font-bold mb-2">EVM Decoder</h2>
+		<div className="bg-white/10 backdrop-blur-md p-6 rounded-lg border-2 border-dashed max-w-lg border-white shadow flex flex-col gap-6">
+			<h2 className="text-lg font-bold mb-2 text-white">EVM Decoder</h2>
 			<Form {...sigForm}>
 				<form
 					className="flex flex-col gap-4"
@@ -208,13 +208,13 @@ export default function Decoder() {
 					{!sig && selector.length === 10 && (
 						<>
 							{isLookupLoading && (
-								<div className="text-sm text-muted-foreground">
+								<div className="text-sm text-gray-300">
 									Looking up possible signatures...
 								</div>
 							)}
 							{sigData?.result.function && (
 								<div className="flex flex-col gap-2">
-									<div className="text-xs text-muted-foreground">
+									<div className="text-xs text-gray-300">
 										Possible signatures from selector:
 									</div>
 									{Object.values(sigData.result.function)
@@ -225,7 +225,7 @@ export default function Decoder() {
 												item && (
 													<button
 														key={idx}
-														className="text-xs text-blue-600 underline text-left hover:text-blue-800"
+														className="text-xs text-blue-400 underline text-left hover:text-blue-300"
 														type="button"
 														onClick={() => handlePickSignature(item.name)}
 													>
@@ -259,12 +259,12 @@ export default function Decoder() {
 				</form>
 			</Form>
 
-			{decodeError && <div className="text-red-500 text-sm">{decodeError}</div>}
-			{sigError && <div className="text-red-500 text-sm">{sigError}</div>}
+			{decodeError && <div className="text-red-400 text-sm">{decodeError}</div>}
+			{sigError && <div className="text-red-400 text-sm">{sigError}</div>}
 			{abiObj && (
 				<div className="flex flex-col gap-2">
-					<div className="text-xs text-muted-foreground">
-						<span className="font-mono text-black">
+									<div className="text-xs text-gray-300">
+					<span className="font-mono text-white">
 							{isAbiFunction(abiObj) || isAbiError(abiObj)
 								? `${abiObj.name}(${abiObj.inputs?.map((i) => i.type).join(",") || ""})`
 								: isTupleObj(abiObj)
@@ -278,7 +278,7 @@ export default function Decoder() {
 				<div className="flex flex-col gap-2">
 					{paramFields.map((field, idx) => (
 						<div key={field.name} className="flex gap-2 items-center">
-							<span className="text-xs text-muted-foreground w-32">
+							<span className="text-xs text-gray-300 w-32">
 								{field.name} ({field.type}):
 							</span>
 							<Input
@@ -295,7 +295,7 @@ export default function Decoder() {
 				<div className="flex flex-col gap-2">
 					{decoded.map((val, idx) => (
 						<div key={idx} className="flex gap-2 items-center">
-							<span className="text-xs text-muted-foreground w-32">
+							<span className="text-xs text-gray-300 w-32">
 								arg{idx}:
 							</span>
 							<Input
