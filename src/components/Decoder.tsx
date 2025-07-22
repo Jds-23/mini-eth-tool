@@ -101,7 +101,6 @@ export default function Decoder() {
 	}
 
 	function isTupleObj(obj: AbiObj) {
-		console.log(!!obj && "components" in obj);
 		return !!obj && "components" in obj;
 	}
 

@@ -38,6 +38,15 @@ export default function Encoder() {
 	const [abiItems, setAbiItems] = useState<AbiItem.AbiItem[] | null>(null);
 	const [selectedIndex, setSelectedIndex] = useState(0);
 
+	// Cleanup timeout on unmount to prevent memory leaks
+	useEffect(() => {
+		return () => {
+			if (copyTimeout.current) {
+				clearTimeout(copyTimeout.current);
+			}
+		};
+	}, []);
+
         // Parse signature or ABI JSON whenever input changes (debounced)
         useEffect(() => {
                 const handle = setTimeout(() => {
