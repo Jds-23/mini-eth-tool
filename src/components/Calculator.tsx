@@ -231,6 +231,10 @@ const Calculator = () => {
 				result = Math.trunc(dec / opVal);
 				break;
 			case "mod":
+				if (opVal === 0) {
+					toast.error("Modulo by zero");
+					return;
+				}
 				result = dec % opVal;
 				break;
 			case "not":
