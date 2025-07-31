@@ -144,8 +144,8 @@ export default function Encoder() {
 	}
 
 	return (
-		<div className="bg-gray-50 p-6 rounded-lg border-2 border-dashed max-w-lg border-black shadow flex flex-col gap-6">
-			<h2 className="text-lg font-bold mb-2">EVM Function Encoder</h2>
+		<div className="bg-white/10 backdrop-blur-md p-6 rounded-lg border-2 border-dashed max-w-lg border-white shadow flex flex-col gap-6">
+			<h2 className="text-lg font-bold mb-2 text-white">EVM Function Encoder</h2>
 			<Form {...sigForm}>
 				<form
 					className="flex flex-col gap-4"
@@ -205,7 +205,7 @@ export default function Encoder() {
 					/>
 				</form>
 			</Form>
-			{sigError && <div className="text-red-500 text-sm">{sigError}</div>}
+			{sigError && <div className="text-red-400 text-sm">{sigError}</div>}
                         {abiItems && abiItems.length > 1 && (
                                 <Select
                                         value={selectedIndex.toString()}
@@ -250,7 +250,7 @@ export default function Encoder() {
 							/>
 						))}
 						{abiObj.type === "tuple" && (
-							<label className="flex items-center gap-2 text-sm">
+							<label className="flex items-center gap-2 text-sm text-white">
 								<input
 									type="checkbox"
 									checked={usePacked}
@@ -336,7 +336,7 @@ export default function Encoder() {
 			)}
 			{/* {abiObj?.type === "event" && (
 				<div className="flex flex-col gap-2">
-					<div className="text-xs text-muted-foreground">
+					<div className="text-xs text-gray-300">
 						Event topic hash (topic0):
 					</div>
 					<Input type="text" readOnly value={abiObj. || ""} />

@@ -283,8 +283,8 @@ const Calculator = () => {
 	}
 
 	return (
-		<div className="bg-gray-50 p-6 rounded-lg border-2 border-dashed max-w-sm border-black shadow flex flex-col gap-6">
-			<h2 className="text-lg font-bold mb-2">
+		<div className="bg-white/10 backdrop-blur-md p-6 rounded-lg border-2 border-dashed max-w-sm border-white shadow flex flex-col gap-6">
+			<h2 className="text-lg font-bold mb-2 text-white">
 				Binary / Decimal / Hex Calculator
 			</h2>
 			<Form {...form}>
